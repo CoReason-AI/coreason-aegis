@@ -123,3 +123,59 @@ def test_complex_mixed_text(scanner: Scanner) -> None:
     assert "LOT-Q2W3E4" in detected_values
     assert "12345" not in detected_values
     assert "ABC-XYZ" not in detected_values
+
+
+def test_gene_sequence_detection(scanner: Scanner) -> None:
+    text = "Sequence ATCGATCGAT found in sample."
+    policy = AegisPolicy(entity_types=["GENE_SEQUENCE"], confidence_score=0.5)
+    results = scanner.scan(text, policy)
+
+    assert len(results) == 1
+    assert results[0].entity_type == "GENE_SEQUENCE"
+    assert text[results[0].start : results[0].end] == "ATCGATCGAT"
+
+
+def test_chemical_cas_detection(scanner: Scanner) -> None:
+    text = "Formaldehyde (CAS 50-00-0) is toxic."
+    policy = AegisPolicy(entity_types=["CHEMICAL_CAS"], confidence_score=0.5)
+    results = scanner.scan(text, policy)
+
+    assert len(results) == 1
+    assert results[0].entity_type == "CHEMICAL_CAS"
+    assert text[results[0].start : results[0].end] == "50-00-0"
+
+
+def test_gene_sequence_boundary(scanner: Scanner) -> None:
+    # Test min length 10
+    text = "Short: ATCGATCGA, Valid: ATCGATCGAT, Long: ATCGATCGATCG"
+    policy = AegisPolicy(entity_types=["GENE_SEQUENCE"], confidence_score=0.5)
+    results = scanner.scan(text, policy)
+
+    detected = [text[r.start : r.end] for r in results]
+    assert "ATCGATCGA" not in detected  # 9 chars
+    assert "ATCGATCGAT" in detected  # 10 chars
+    assert "ATCGATCGATCG" in detected  # 12 chars
+
+    # Test valid characters (only A, T, C, G)
+    text_invalid = "ATCGXATCGAT"
+    results_invalid = scanner.scan(text_invalid, policy)
+    # The X breaks the sequence into "ATCG" and "ATCGAT", both too short.
+    # Or matches \b[ATCG]{10,}\b -> no match.
+    assert len(results_invalid) == 0
+
+
+def test_chemical_cas_formats(scanner: Scanner) -> None:
+    # Test CAS format: 2-7 digits - 2 digits - 1 digit
+    # e.g., 50-00-0 (Formaldehyde), 7732-18-5 (Water)
+    text = "50-00-0, 7732-18-5, 1234567-89-0. Invalid: 1-22-3, 12-3-4, 12-34-56"
+    policy = AegisPolicy(entity_types=["CHEMICAL_CAS"], confidence_score=0.5)
+    results = scanner.scan(text, policy)
+
+    detected = [text[r.start : r.end] for r in results]
+    assert "50-00-0" in detected
+    assert "7732-18-5" in detected
+    assert "1234567-89-0" in detected
+
+    assert "1-22-3" not in detected  # First part too short (min 2)
+    assert "12-3-4" not in detected  # Middle part too short (min 2)
+    assert "12-34-56" not in detected  # Last part too long (max 1)

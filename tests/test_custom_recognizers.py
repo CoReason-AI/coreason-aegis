@@ -179,3 +179,62 @@ def test_chemical_cas_formats(scanner: Scanner) -> None:
     assert "1-22-3" not in detected  # First part too short (min 2)
     assert "12-3-4" not in detected  # Middle part too short (min 2)
     assert "12-34-56" not in detected  # Last part too long (max 1)
+
+
+def test_gene_sequence_case_sensitivity(scanner: Scanner) -> None:
+    # Test that lowercase sequences are detected (Presidio/Regex interaction)
+    # If the regex is \b[ATCG]{10,}\b, it technically only matches Uppercase.
+    # However, Presidio often defaults to case-insensitive or we might need to adjust regex.
+    # Let's verify behavior. If this fails, we need (?i) in regex.
+    text = "Lowercase: atcgatcgat, Mixed: AtCgAtCgAt"
+    policy = AegisPolicy(entity_types=["GENE_SEQUENCE"], confidence_score=0.5)
+    results = scanner.scan(text, policy)
+
+    detected = [text[r.start : r.end] for r in results]
+
+    # We expect these to be detected if we want robust scanning.
+    # If the current implementation is strict [ATCG], these might fail.
+    # But usually PII scanning prefers recall.
+    # Let's see if they are detected.
+    assert "atcgatcgat" in detected
+    assert "AtCgAtCgAt" in detected
+
+
+def test_cas_false_positives(scanner: Scanner) -> None:
+    # CAS is digits-digits-digit (last part is 1 digit)
+    # ISO Date is YYYY-MM-DD (last part is 2 digits)
+    text = "Date: 2023-10-01. CAS: 50-00-0. ID: 123-45-678."
+    policy = AegisPolicy(entity_types=["CHEMICAL_CAS"], confidence_score=0.5)
+    results = scanner.scan(text, policy)
+
+    detected = [text[r.start : r.end] for r in results]
+    assert "50-00-0" in detected
+    assert "2023-10-01" not in detected  # Last part has 2 digits
+    assert "123-45-678" not in detected  # Last part has 3 digits
+
+
+def test_complex_scientific_scenario(scanner: Scanner) -> None:
+    # Mixed valid and invalid entities
+    text = (
+        "Experiment on gene ATCGATCGAT (fragment: ATCGA) using "
+        "reagent 50-00-0 (Formaldehyde) and 7732-18-5 (Water). "
+        "Recorded on 2023-11-15. "
+        "Avoid contamination with RNA sequence AUCGAUCGAU."
+    )
+    policy = AegisPolicy(entity_types=["GENE_SEQUENCE", "CHEMICAL_CAS"], confidence_score=0.5)
+    results = scanner.scan(text, policy)
+
+    detected = {text[r.start : r.end] for r in results}
+
+    # Valid Genes
+    assert "ATCGATCGAT" in detected
+    # Invalid Genes
+    assert "ATCGA" not in detected  # Too short
+    assert "AUCGAUCGAU" not in detected  # Contains U (RNA), regex expects ATCG
+
+    # Valid Chemicals
+    assert "50-00-0" in detected
+    assert "7732-18-5" in detected
+
+    # False Positives
+    assert "2023-11-15" not in detected

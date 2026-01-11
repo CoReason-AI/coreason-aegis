@@ -1,5 +1,7 @@
-from typing import Dict, List, Tuple
+import hashlib
+from typing import Any, Dict, List, Tuple, cast
 
+from faker import Faker
 from presidio_analyzer import RecognizerResult
 
 from coreason_aegis.models import AegisPolicy, DeIdentificationMap, RedactionMode
@@ -13,6 +15,8 @@ class MaskingEngine:
 
     def __init__(self, vault: VaultManager) -> None:
         self.vault = vault
+        # Initialize Faker once. We will seed it per usage.
+        self.faker = Faker()
 
     def mask(
         self,
@@ -28,18 +32,6 @@ class MaskingEngine:
         # Retrieve existing map or create new one
         deid_map = self.vault.get_map(session_id)
         if not deid_map:
-            # We need to decide on expiration. For now, let's assume caller or vault default handles it,
-            # but DeIdentificationMap requires expires_at.
-            # Ideally, the main Aegis class orchestrates session creation.
-            # Here, we might just need to accept an existing map object or raise if not found?
-            # Or simplified: if not found, we cannot maintain consistency easily without creation logic.
-            # Let's assume the map SHOULD exist or we create a fresh one here.
-            # But wait, creating here requires knowing expiration policy.
-            # Let's assume we pass the map IN or get it from Vault.
-            # If it's None, we might fail or create new.
-            # Let's simplify: Return the map updates, caller saves.
-            # Actually, the requirement says "Vault of Identity... stored ephemerally".
-            # Let's try to get it, if not, create new with default 1 hour?
             from datetime import datetime, timedelta, timezone
 
             deid_map = DeIdentificationMap(
@@ -86,8 +78,8 @@ class MaskingEngine:
                     deid_map.mappings[replacement] = entity_text
                     real_to_token[entity_text] = replacement
             elif policy.mode == RedactionMode.SYNTHETIC:
-                # Fallback to MASK for now
-                replacement = f"[{token_prefix}]"
+                # Deterministic synthetic replacement
+                replacement = self._get_synthetic_replacement(entity_text, result.entity_type)
             else:
                 replacement = f"[{token_prefix}]"
 
@@ -102,10 +94,48 @@ class MaskingEngine:
         for start, end, repl in replacements:
             masked_text = masked_text[:start] + repl + masked_text[end:]
 
-        # Save updated map
+        # Save updated map (Only relevant for REPLACE mode,
+        # but saving is harmless/idempotent for others if mapping didn't change)
         self.vault.save_map(deid_map)
 
         return masked_text, deid_map
+
+    def _get_synthetic_replacement(self, text: str, entity_type: str) -> str:
+        """
+        Generates a deterministic synthetic value using Faker.
+        """
+        # Hash the input text to seed Faker
+        # Use hashlib.sha256 for consistency
+        hash_object = hashlib.sha256(text.encode("utf-8"))
+        # Convert hash to integer for seeding
+        seed_val = int(hash_object.hexdigest(), 16)
+
+        # Faker.seed() is global, which is thread-unsafe and bad practice if used globally.
+        # However, Faker instances can be seeded individually if we use the generator correctly.
+        # The standard Faker class proxies to a generator.
+        # self.faker.seed_instance(seed_val) is the correct way for the instance.
+        self.faker.seed_instance(seed_val)
+
+        if entity_type == "PERSON":
+            return cast(str, cast(Any, self.faker.name()))
+        elif entity_type == "EMAIL_ADDRESS":
+            return cast(str, cast(Any, self.faker.email()))
+        elif entity_type == "PHONE_NUMBER":
+            return cast(str, cast(Any, self.faker.phone_number()))
+        elif entity_type == "IP_ADDRESS":
+            return cast(str, cast(Any, self.faker.ipv4()))
+        elif entity_type == "DATE_TIME":
+            return cast(str, cast(Any, self.faker.date()))
+        else:
+            # Fallback for custom entities or unknown standard ones
+            # For things like MRN, maybe random digits?
+            # Or just return a placeholder + random string?
+            # Let's try to be smart or generic.
+            if "ID" in entity_type or "NUMBER" in entity_type or "MRN" in entity_type:
+                return str(self.faker.random_number(digits=8))
+
+            # Use a generic word
+            return cast(str, cast(Any, self.faker.word()))
 
     @staticmethod
     def _generate_suffix(count: int) -> str:

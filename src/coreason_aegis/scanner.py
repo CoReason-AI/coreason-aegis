@@ -1,4 +1,4 @@
-from typing import List, Optional, cast
+from typing import Any, List, Optional, cast
 
 from presidio_analyzer import AnalyzerEngine, Pattern, PatternRecognizer, RecognizerResult
 
@@ -89,7 +89,7 @@ class Scanner:
                 score_threshold=policy.confidence_score,
                 allow_list=policy.allow_list,
             )
-            return cast(List[RecognizerResult], results)
+            return cast(List[RecognizerResult], cast(Any, results))
         except Exception as e:
             logger.error(f"Scan failed: {e}")
             # Fail Closed: If scanning fails, we must alert or block.

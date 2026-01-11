@@ -9,6 +9,7 @@ class RedactionMode(str, Enum):
     MASK = "MASK"  # [PERSON]
     REPLACE = "REPLACE"  # [PATIENT_A]
     SYNTHETIC = "SYNTHETIC"  # "Jane Doe"
+    HASH = "HASH"  # "a591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e"
 
 
 class AegisPolicy(BaseModel):

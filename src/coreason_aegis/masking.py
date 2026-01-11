@@ -77,8 +77,13 @@ class MaskingEngine:
                 continue
 
             # Determine replacement
+            # Map PERSON to PATIENT token prefix
+            token_prefix = result.entity_type
+            if token_prefix == "PERSON":
+                token_prefix = "PATIENT"
+
             if policy.mode == RedactionMode.MASK:
-                replacement = f"[{result.entity_type}]"
+                replacement = f"[{token_prefix}]"
             elif policy.mode == RedactionMode.REPLACE:
                 # Consistency check
                 if entity_text in real_to_token:
@@ -98,9 +103,9 @@ class MaskingEngine:
                     # Let's try to generate A, B, C...
 
                     # Count existing tokens of this type
-                    existing_count = sum(1 for t in deid_map.mappings.keys() if t.startswith(f"[{result.entity_type}_"))
+                    existing_count = sum(1 for t in deid_map.mappings.keys() if t.startswith(f"[{token_prefix}_"))
                     suffix = self._generate_suffix(existing_count)
-                    replacement = f"[{result.entity_type}_{suffix}]"
+                    replacement = f"[{token_prefix}_{suffix}]"
 
                     # Update maps
                     deid_map.mappings[replacement] = entity_text
@@ -108,9 +113,9 @@ class MaskingEngine:
 
             elif policy.mode == RedactionMode.SYNTHETIC:
                 # Not fully implemented yet, fallback to MASK
-                replacement = f"[{result.entity_type}]"
+                replacement = f"[{token_prefix}]"
             else:
-                replacement = f"[{result.entity_type}]"
+                replacement = f"[{token_prefix}]"
 
             # Apply replacement
             masked_text = masked_text[: result.start] + replacement + masked_text[result.end :]

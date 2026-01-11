@@ -8,6 +8,6 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_aegis
 
-"""
-Utils module.
-"""
+from coreason_aegis.utils.logger import logger
+
+__all__ = ["logger"]

@@ -47,6 +47,11 @@ class Aegis:
             # 1. Scan
             results = self.scanner.scan(text, active_policy)
 
+            # Check for API Keys and alert
+            for result in results:
+                if result.entity_type == "SECRET_KEY":
+                    logger.warning("Credential Exposure Attempt detected. Redacting API Key.")
+
             # 2. Mask
             masked_text, deid_map = self.masking_engine.mask(text, results, active_policy, session_id)
 

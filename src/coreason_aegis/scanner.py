@@ -61,6 +61,12 @@ class Scanner:
         cas_recognizer = PatternRecognizer(supported_entity="CHEMICAL_CAS", patterns=[cas_pattern])
         analyzer.registry.add_recognizer(cas_recognizer)
 
+        # API_KEY: OpenAI or similar API keys starting with sk-
+        # Regex: \bsk-[a-zA-Z0-9-]{20,}\b (Matches sk- followed by at least 20 alphanumeric/hyphen chars)
+        api_key_pattern = Pattern(name="api_key_pattern", regex=r"\bsk-[a-zA-Z0-9-]{20,}\b", score=0.95)
+        api_key_recognizer = PatternRecognizer(supported_entity="SECRET_KEY", patterns=[api_key_pattern])
+        analyzer.registry.add_recognizer(api_key_recognizer)
+
     @property
     def analyzer(self) -> AnalyzerEngine:
         if self._analyzer is None:

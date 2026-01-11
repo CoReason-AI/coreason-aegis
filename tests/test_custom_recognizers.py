@@ -238,3 +238,38 @@ def test_complex_scientific_scenario(scanner: Scanner) -> None:
 
     # False Positives
     assert "2023-11-15" not in detected
+
+
+def test_api_key_detection(scanner: Scanner) -> None:
+    # Also test typical OpenAI key structure (usually ~51 chars, sk-...48 chars)
+    # But for test purposes, our regex is >= 20 chars after sk-
+    # Wait, regex is sk-[...]{20,}.
+    # So sk- + 20 chars = 23 chars total.
+
+    valid_key = "sk-" + "a" * 20
+
+    text = f"Key1: {valid_key}."
+
+    policy = AegisPolicy(entity_types=["SECRET_KEY"], confidence_score=0.5)
+    results = scanner.scan(text, policy)
+
+    assert len(results) == 1
+    assert results[0].entity_type == "SECRET_KEY"
+    assert text[results[0].start : results[0].end] == valid_key
+
+
+def test_api_key_boundary(scanner: Scanner) -> None:
+    # Test length constraints
+    # Regex: sk-[...]{20,}
+
+    short_val = "sk-" + "a" * 19  # 19 chars suffix -> Total 22. Should NOT match.
+    exact_val = "sk-" + "a" * 20  # 20 chars suffix -> Total 23. Should match.
+
+    text = f"Short: {short_val}, Exact: {exact_val}"
+
+    policy = AegisPolicy(entity_types=["SECRET_KEY"], confidence_score=0.5)
+    results = scanner.scan(text, policy)
+
+    detected = [text[r.start : r.end] for r in results]
+    assert short_val not in detected
+    assert exact_val in detected

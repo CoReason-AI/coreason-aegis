@@ -125,12 +125,24 @@ class MaskingEngine:
 
         return masked_text, deid_map
 
-    def _generate_suffix(self, count: int) -> str:
+    @staticmethod
+    def _generate_suffix(count: int) -> str:
         """
-        Generates a suffix A, B, ... Z, AA, AB... based on count.
+        Generates a suffix A, B, ... Z, AA, AB... based on count (0-based index).
+        Bijective Base-26 system.
         0 -> A
+        25 -> Z
+        26 -> AA
         """
-        # Simple implementation for A-Z
-        if count < 26:
-            return chr(65 + count)
-        return f"{count}"  # Fallback for now
+        if count < 0:
+            raise ValueError("Count must be non-negative")
+
+        n = count
+        result = ""
+        while True:
+            n, r = divmod(n, 26)
+            result = chr(65 + r) + result
+            if n == 0:
+                break
+            n -= 1
+        return result

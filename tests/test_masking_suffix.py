@@ -23,3 +23,12 @@ def test_generate_suffix_boundaries() -> None:
     assert engine._generate_suffix(52) == "BA"
     assert engine._generate_suffix(701) == "ZZ"
     assert engine._generate_suffix(702) == "AAA"
+
+
+def test_generate_suffix_negative() -> None:
+    vault = VaultManager()
+    engine = MaskingEngine(vault)
+    import pytest
+
+    with pytest.raises(ValueError):
+        engine._generate_suffix(-1)

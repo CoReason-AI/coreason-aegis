@@ -132,4 +132,4 @@ def test_suffix_generation(engine: MaskingEngine) -> None:
     # Test internal helper
     assert engine._generate_suffix(0) == "A"
     assert engine._generate_suffix(25) == "Z"
-    assert engine._generate_suffix(26) == "26"
+    assert engine._generate_suffix(26) == "AA"

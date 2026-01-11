@@ -1,10 +1,10 @@
-import pytest
-from unittest.mock import MagicMock, patch
 from typing import Generator
+from unittest.mock import MagicMock, patch
+
+import pytest
 from presidio_analyzer import RecognizerResult
 
 from coreason_aegis.main import Aegis
-from coreason_aegis.models import AegisPolicy, RedactionMode
 
 
 @pytest.fixture
@@ -124,8 +124,9 @@ def test_story_a_safe_consultation(aegis: Aegis, mock_scanner_engine: MagicMock)
 
     assert final_output == "For John Doe, considering the rash..."
 
+
 def test_desanitize_exception(aegis: Aegis, mock_scanner_engine: MagicMock) -> None:
     # Force exception during re-identification
-    with patch.object(aegis.reidentifier, 'reidentify', side_effect=Exception("Re-id error")):
+    with patch.object(aegis.reidentifier, "reidentify", side_effect=Exception("Re-id error")):
         with pytest.raises(Exception, match="Re-id error"):
             aegis.desanitize("text", "sess_err")

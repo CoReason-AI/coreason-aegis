@@ -48,3 +48,50 @@ def test_masking_hash_consistency(masking_engine: MaskingEngine) -> None:
     masked_text_2, _ = masking_engine.mask(text, results, policy, "session_2")
 
     assert masked_text_1 == masked_text_2
+
+
+def test_masking_hash_unicode(masking_engine: MaskingEngine) -> None:
+    """
+    Test that hashing handles Unicode characters correctly.
+    """
+    # "Renée" contains a non-ASCII character
+    text = "Contact Renée for details."
+    # Indices: "Renée" starts at 8, ends at 13
+    results = [RecognizerResult(entity_type="PERSON", start=8, end=13, score=1.0)]
+
+    policy = AegisPolicy(mode=RedactionMode.HASH, entity_types=["PERSON"])
+    session_id = "test_session_unicode"
+
+    masked_text, _ = masking_engine.mask(text, results, policy, session_id)
+
+    expected_hash = hashlib.sha256("Renée".encode("utf-8")).hexdigest()
+    assert masked_text == f"Contact {expected_hash} for details."
+
+
+def test_masking_hash_repeated_and_multiple(masking_engine: MaskingEngine) -> None:
+    """
+    Test that repeated entities get the same hash and distinct entities get different hashes.
+    """
+    text = "John and Jane went to see John."
+    # "John" at 0-4
+    # "Jane" at 9-13
+    # "John" at 26-30
+    results = [
+        RecognizerResult(entity_type="PERSON", start=0, end=4, score=1.0),
+        RecognizerResult(entity_type="PERSON", start=9, end=13, score=1.0),
+        RecognizerResult(entity_type="PERSON", start=26, end=30, score=1.0),
+    ]
+
+    policy = AegisPolicy(mode=RedactionMode.HASH, entity_types=["PERSON"])
+    session_id = "test_session_multiple"
+
+    masked_text, _ = masking_engine.mask(text, results, policy, session_id)
+
+    hash_john = hashlib.sha256("John".encode("utf-8")).hexdigest()
+    hash_jane = hashlib.sha256("Jane".encode("utf-8")).hexdigest()
+
+    # The resulting string should replace occurrences in place
+    expected_text = f"{hash_john} and {hash_jane} went to see {hash_john}."
+
+    assert masked_text == expected_text
+    assert hash_john != hash_jane

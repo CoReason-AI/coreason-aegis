@@ -49,6 +49,18 @@ class Scanner:
         lot_recognizer = PatternRecognizer(supported_entity="LOT_NUMBER", patterns=[lot_pattern])
         analyzer.registry.add_recognizer(lot_recognizer)
 
+        # GENE_SEQUENCE: DNA sequences (e.g., ATCGATCGAT)
+        # Regex: \b[ATCG]{10,}\b (Matches sequences of length 10 or more)
+        gene_pattern = Pattern(name="gene_pattern", regex=r"\b[ATCG]{10,}\b", score=0.85)
+        gene_recognizer = PatternRecognizer(supported_entity="GENE_SEQUENCE", patterns=[gene_pattern])
+        analyzer.registry.add_recognizer(gene_recognizer)
+
+        # CHEMICAL_CAS: CAS Registry Numbers (e.g., 50-00-0)
+        # Regex: \b\d{2,7}-\d{2}-\d\b
+        cas_pattern = Pattern(name="cas_pattern", regex=r"\b\d{2,7}-\d{2}-\d\b", score=0.85)
+        cas_recognizer = PatternRecognizer(supported_entity="CHEMICAL_CAS", patterns=[cas_pattern])
+        analyzer.registry.add_recognizer(cas_recognizer)
+
     @property
     def analyzer(self) -> AnalyzerEngine:
         if self._analyzer is None:

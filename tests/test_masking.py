@@ -67,16 +67,86 @@ def test_mask_mask_mode(engine: MaskingEngine) -> None:
 
 
 def test_mask_synthetic_mode(engine: MaskingEngine) -> None:
-    # SYNTHETIC mode currently falls back to MASK
     policy = AegisPolicy(mode=RedactionMode.SYNTHETIC)
-    text = "John."
-    results = [RecognizerResult("PERSON", 0, 4, 1.0)]
+    text = "John met Jane."
+    results = [
+        RecognizerResult("PERSON", 0, 4, 1.0),
+        RecognizerResult("PERSON", 9, 13, 1.0),
+    ]
     session_id = "sess_1"
 
     masked_text, deid_map = engine.mask(text, results, policy, session_id)
 
-    assert masked_text == "[PATIENT]."
+    # Should be replaced by names, not tokens
+    assert "[PATIENT" not in masked_text
+    assert "John" not in masked_text
+    assert "Jane" not in masked_text
+    # Faker names might have spaces (e.g. "John Smith"), so we can't strict split count
+    # assert len(masked_text.split()) == 3
+
+    # Verify no mapping
     assert len(deid_map.mappings) == 0
+
+    # Verify determinism
+    masked_text_2, _ = engine.mask(text, results, policy, session_id)
+    assert masked_text == masked_text_2
+
+
+def test_mask_synthetic_mode_types(engine: MaskingEngine) -> None:
+    policy = AegisPolicy(mode=RedactionMode.SYNTHETIC)
+    text = "test@example.com at 127.0.0.1 call 555-1234 on 2023-01-01"
+    results = [
+        RecognizerResult("EMAIL_ADDRESS", 0, 16, 1.0),
+        RecognizerResult("IP_ADDRESS", 20, 29, 1.0),
+        RecognizerResult("PHONE_NUMBER", 35, 43, 1.0),
+        RecognizerResult("DATE_TIME", 47, 57, 1.0),
+    ]
+    session_id = "sess_types"
+
+    masked_text, _ = engine.mask(text, results, policy, session_id)
+    parts = masked_text.split()
+
+    # Check replacements
+    assert "@" in parts[0]  # Email
+    assert "." in parts[2]  # IP
+    # Phone usually has digits, format varies
+    assert any(c.isdigit() for c in parts[4])
+    # Date format varies, but shouldn't be the original
+    assert "2023-01-01" not in masked_text
+
+
+def test_mask_synthetic_mode_fallback(engine: MaskingEngine) -> None:
+    policy = AegisPolicy(mode=RedactionMode.SYNTHETIC)
+    text = "MRN123456 and RANDOM"
+    results = [
+        RecognizerResult("MRN", 0, 9, 1.0),
+        RecognizerResult("UNKNOWN_TYPE", 14, 20, 1.0),
+    ]
+    session_id = "sess_fallback"
+
+    masked_text, _ = engine.mask(text, results, policy, session_id)
+    parts = masked_text.split()
+
+    # MRN triggers ID logic (random number)
+    assert parts[0].isdigit()
+    # UNKNOWN_TYPE triggers generic word
+    assert parts[2].isalpha()
+
+
+def test_mask_synthetic_consistency_across_instances(vault: VaultManager) -> None:
+    # Determinism should hold even with new engine instances
+    policy = AegisPolicy(mode=RedactionMode.SYNTHETIC)
+    text = "John"
+    results = [RecognizerResult("PERSON", 0, 4, 1.0)]
+    session_id = "sess_1"
+
+    engine1 = MaskingEngine(vault)
+    masked1, _ = engine1.mask(text, results, policy, session_id)
+
+    engine2 = MaskingEngine(vault)
+    masked2, _ = engine2.mask(text, results, policy, session_id)
+
+    assert masked1 == masked2
 
 
 def test_mask_unknown_mode(engine: MaskingEngine) -> None:

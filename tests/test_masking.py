@@ -46,10 +46,12 @@ def test_mask_replace_mode_different_entities(engine: MaskingEngine) -> None:
 
     masked_text, deid_map = engine.mask(text, results, policy, session_id)
 
-    assert masked_text == "[PATIENT_B] met [PATIENT_A]."
+    # With Pass 1 (Forward Assignment), John appears first -> PATIENT_A
+    # Jane appears second -> PATIENT_B
+    assert masked_text == "[PATIENT_A] met [PATIENT_B]."
     assert len(deid_map.mappings) == 2
-    assert deid_map.mappings["[PATIENT_A]"] == "Jane"
-    assert deid_map.mappings["[PATIENT_B]"] == "John"
+    assert deid_map.mappings["[PATIENT_A]"] == "John"
+    assert deid_map.mappings["[PATIENT_B]"] == "Jane"
 
 
 def test_mask_mask_mode(engine: MaskingEngine) -> None:
@@ -133,3 +135,47 @@ def test_suffix_generation(engine: MaskingEngine) -> None:
     assert engine._generate_suffix(0) == "A"
     assert engine._generate_suffix(25) == "Z"
     assert engine._generate_suffix(26) == "AA"
+
+
+def test_mask_high_volume_entities(engine: MaskingEngine) -> None:
+    # Simulate a document with many unique entities to force suffix transitions
+    # We want to cover A-Z, AA-ZZ transitions.
+    # 26 (A-Z) + 26*26 (AA-ZZ) = 702 entities.
+    # Let's generate 705 distinct names.
+
+    count = 705
+    entities = [f"Person_{i}" for i in range(count)]
+    text = " ".join(entities)
+
+    # Manually construct results (simulating Scanner)
+    results = []
+    cursor = 0
+    for entity in entities:
+        start = text.find(entity, cursor)
+        end = start + len(entity)
+        results.append(RecognizerResult("PERSON", start, end, 1.0))
+        cursor = end + 1  # +1 for space
+
+    policy = AegisPolicy(mode=RedactionMode.REPLACE)
+    session_id = "sess_high_vol"
+
+    masked_text, deid_map = engine.mask(text, results, policy, session_id)
+
+    # Check that we have 705 unique mappings
+    assert len(deid_map.mappings) == count
+
+    # Check specific tokens
+    # First should be A
+    assert deid_map.mappings["[PATIENT_A]"] == "Person_0"
+    # 26th (index 25) should be Z
+    assert deid_map.mappings["[PATIENT_Z]"] == "Person_25"
+    # 27th (index 26) should be AA
+    assert deid_map.mappings["[PATIENT_AA]"] == "Person_26"
+    # 702th (index 701) should be ZZ
+    assert deid_map.mappings["[PATIENT_ZZ]"] == "Person_701"
+    # 703th (index 702) should be AAA
+    assert deid_map.mappings["[PATIENT_AAA]"] == "Person_702"
+
+    # Verify masked text format roughly
+    assert "[PATIENT_A]" in masked_text
+    assert "[PATIENT_AAA]" in masked_text

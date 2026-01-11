@@ -1,3 +1,5 @@
+import sys
+
 from coreason_aegis.masking import MaskingEngine
 from coreason_aegis.vault import VaultManager
 
@@ -32,3 +34,22 @@ def test_generate_suffix_negative() -> None:
 
     with pytest.raises(ValueError):
         engine._generate_suffix(-1)
+
+
+def test_generate_suffix_large_numbers() -> None:
+    vault = VaultManager()
+    engine = MaskingEngine(vault)
+
+    # 26^3 + 26^2 + 26 = 17576 + 676 + 26 = 18278 (approx)
+    # Just checking it doesn't crash and returns something reasonable
+
+    # Check a known large value if possible, or just property
+    # 18277 -> ZZZ
+    assert engine._generate_suffix(18277) == "ZZZ"
+    assert engine._generate_suffix(18278) == "AAAA"
+
+    # Very large number
+    large_suffix = engine._generate_suffix(sys.maxsize)
+    assert len(large_suffix) > 0
+    assert large_suffix.isupper()
+    assert large_suffix.isalpha()

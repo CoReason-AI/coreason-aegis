@@ -137,10 +137,10 @@ def test_story_a_safe_consultation(aegis: Aegis, mock_scanner_engine: MagicMock)
     # 1. Sanitize
     sanitized_prompt, _ = aegis.sanitize(user_prompt, session_id)
 
-    # Expect: "Patient [PATIENT_A] (DOB: [DATE_TIME_A]) has a rash."
+    # Expect: "Patient [PATIENT_A] (DOB: [DATE_A]) has a rash."
     # Note: Our default policy uses REPLACE.
     assert "[PATIENT_A]" in sanitized_prompt
-    assert "[DATE_TIME_A]" in sanitized_prompt
+    assert "[DATE_A]" in sanitized_prompt
     assert "John Doe" not in sanitized_prompt
 
     # 2. LLM Response
@@ -176,8 +176,8 @@ def test_story_b_leak_prevention(aegis: Aegis, mock_scanner_engine: MagicMock, l
     masked_text, _ = aegis.sanitize(text, session_id)
 
     # Verify masking
-    # [SECRET_KEY_A]
-    assert "[SECRET_KEY_A]" in masked_text
+    # [KEY_A]
+    assert "[KEY_A]" in masked_text
     assert "sk-12345" not in masked_text
 
     # Verify Alert

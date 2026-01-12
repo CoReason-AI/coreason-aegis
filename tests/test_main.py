@@ -3,9 +3,10 @@ from typing import Generator
 from unittest.mock import MagicMock, patch
 
 import pytest
-from coreason_aegis.main import Aegis
 from loguru import logger
 from presidio_analyzer import RecognizerResult
+
+from coreason_aegis.main import Aegis
 
 
 @pytest.fixture

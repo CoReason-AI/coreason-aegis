@@ -1,8 +1,9 @@
 import pytest
+from presidio_analyzer import RecognizerResult
+
 from coreason_aegis.masking import MaskingEngine
 from coreason_aegis.models import AegisPolicy, RedactionMode
 from coreason_aegis.vault import VaultManager
-from presidio_analyzer import RecognizerResult
 
 
 @pytest.fixture

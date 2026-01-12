@@ -67,6 +67,9 @@ disallow_untyped_decorators = false
 [tool.pytest.ini_options]
 addopts = "--cov=src --cov-report=term-missing --cov-fail-under=100"
 testpaths = ["tests"]
+markers = [
+    "integration: mark a test as an integration test",
+]
 
 [tool.coverage.run]
 omit = ["tests/*"]

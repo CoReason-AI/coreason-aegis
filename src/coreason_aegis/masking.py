@@ -58,9 +58,7 @@ class MaskingEngine:
                 continue
 
             # Determine token prefix
-            token_prefix = result.entity_type
-            if token_prefix == "PERSON":
-                token_prefix = "PATIENT"
+            token_prefix = self._normalize_entity_type(result.entity_type)
 
             replacement = ""
             if policy.mode == RedactionMode.MASK:
@@ -140,6 +138,31 @@ class MaskingEngine:
 
             # Use a generic word
             return cast(str, cast(Any, self.faker.word()))
+
+    @staticmethod
+    def _normalize_entity_type(entity_type: str) -> str:
+        """
+        Normalizes Presidio entity types to simplified tokens per PRD.
+        DATE_TIME -> DATE
+        EMAIL_ADDRESS -> EMAIL
+        PHONE_NUMBER -> PHONE
+        IP_ADDRESS -> IP
+        SECRET_KEY -> KEY
+        PERSON -> PATIENT
+        """
+        if entity_type == "PERSON":
+            return "PATIENT"
+        elif entity_type == "DATE_TIME":
+            return "DATE"
+        elif entity_type == "EMAIL_ADDRESS":
+            return "EMAIL"
+        elif entity_type == "PHONE_NUMBER":
+            return "PHONE"
+        elif entity_type == "IP_ADDRESS":
+            return "IP"
+        elif entity_type == "SECRET_KEY":
+            return "KEY"
+        return entity_type
 
     @staticmethod
     def _generate_suffix(count: int) -> str:

@@ -1,5 +1,4 @@
 import pytest
-
 from coreason_aegis.models import AegisPolicy
 from coreason_aegis.scanner import Scanner
 

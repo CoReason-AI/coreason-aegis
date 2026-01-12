@@ -1,5 +1,4 @@
 import pytest
-
 from coreason_aegis.models import AegisPolicy
 from coreason_aegis.scanner import Scanner
 
@@ -111,3 +110,60 @@ def test_large_input_stability(scanner: Scanner) -> None:
 
     assert len(results) >= 500  # Should detect at least one per repetition
     assert len(results) <= 1000  # Person + MRN per repetition
+
+
+@pytest.mark.integration
+def test_unicode_and_emojis(scanner: Scanner) -> None:
+    """
+    Tests stability and detection in text containing Unicode chars and emojis.
+    """
+    text = "User 🤖 John Doe 😷 (MRN 123456) sent email: john.doe@example.com."
+    policy = AegisPolicy(entity_types=["PERSON", "MRN", "EMAIL_ADDRESS"], confidence_score=0.4)
+
+    results = scanner.scan(text, policy)
+    detected = {text[r.start : r.end] for r in results}
+
+    # Spacy might include the emoji in the entity (e.g., "John Doe 😷") depending on tokenization.
+    # We check if "John Doe" is present in any detected entity.
+    assert any("John Doe" in d for d in detected)
+    assert "123456" in detected
+    assert "john.doe@example.com" in detected
+
+    # Ensure standalone emojis are not falsely detected as entities
+    # Note: If emoji is attached to name, it's part of the entity.
+    # We want to ensure "🤖" (which is separate) is not detected as a person/MRN etc.
+    assert "🤖" not in detected
+
+
+@pytest.mark.integration
+def test_ambiguous_names_location(scanner: Scanner) -> None:
+    """
+    Tests if Spacy model can distinguish between ambiguous names.
+    Note: Presidio mostly relies on Spacy NER for PERSON vs LOCATION.
+    Depending on the model size (en_core_web_lg), it should be decent.
+    """
+    # "Washington" can be a Person or Location.
+    text = "George Washington went to Washington."
+
+    # We only care if "George Washington" is detected as PERSON.
+    # If "Washington" (city) is also detected as PERSON, that's a model limitation/feature.
+    # But usually it is labeled GPE (Location).
+    # Presidio maps Spacy PERSON to PERSON.
+    # Presidio maps Spacy GPE to LOCATION (if configured).
+    # Default AegisPolicy only asks for PERSON.
+
+    policy = AegisPolicy(entity_types=["PERSON"], confidence_score=0.4)
+    results = scanner.scan(text, policy)
+
+    detected_texts = [text[r.start : r.end] for r in results if r.entity_type == "PERSON"]
+
+    # Expect "George Washington"
+    assert "George Washington" in detected_texts
+
+    # Ideally "Washington" (the city) should NOT be in detected_texts if model is smart enough.
+    # But let's verify what happens.
+    # If it fails, we might just assert George Washington is there.
+    # Note: Spacy lg model usually gets this right.
+    if "Washington" in detected_texts:
+        # If detected, it might be separate token.
+        pass

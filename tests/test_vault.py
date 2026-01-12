@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
-
 from coreason_aegis.models import DeIdentificationMap
 from coreason_aegis.vault import VaultManager
 

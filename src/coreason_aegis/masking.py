@@ -80,6 +80,10 @@ class MaskingEngine:
             elif policy.mode == RedactionMode.SYNTHETIC:
                 # Deterministic synthetic replacement
                 replacement = self._get_synthetic_replacement(entity_text, result.entity_type)
+            elif policy.mode == RedactionMode.HASH:
+                # Deterministic HASH replacement
+                # Use SHA-256 and return hex digest
+                replacement = hashlib.sha256(entity_text.encode("utf-8")).hexdigest()
             else:
                 replacement = f"[{token_prefix}]"
 

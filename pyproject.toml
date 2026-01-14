@@ -14,6 +14,7 @@ presidio-analyzer = "^2.2.360"
 presidio-anonymizer = "^2.2.360"
 pydantic = "^2.12.5"
 faker = "^40.1.0"
+cachetools = "^6.2.4"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2.2"
@@ -24,6 +25,7 @@ mkdocs = "^1.6.0"
 mkdocs-material = "^9.5.26"
 pydantic-settings = "^2.12.0"
 mypy = "^1.19.1"
+types-cachetools = "^6.2.0.20251022"
 
 [build-system]
 requires = ["poetry-core"]

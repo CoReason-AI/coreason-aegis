@@ -18,7 +18,8 @@ class AegisPolicy(BaseModel):
         default_factory=lambda: ["PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER", "IP_ADDRESS", "DATE_TIME"]
     )
     mode: RedactionMode = RedactionMode.REPLACE
-    confidence_score: float = 0.85
+    # Lowered confidence score to ensure high recall for things like Dates
+    confidence_score: float = 0.40
 
 
 class DeIdentificationMap(BaseModel):

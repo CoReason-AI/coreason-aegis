@@ -2556,6 +2556,18 @@ typing-extensions = ">=3.7.4.3"
 standard = ["rich (>=10.11.0)", "shellingham (>=1.3.0)"]
 
 [[package]]
+name = "types-cachetools"
+version = "6.2.0.20251022"
+description = "Typing stubs for cachetools"
+optional = false
+python-versions = ">=3.9"
+groups = ["dev"]
+files = [
+    {file = "types_cachetools-6.2.0.20251022-py3-none-any.whl", hash = "sha256:698eb17b8f16b661b90624708b6915f33dbac2d185db499ed57e4997e7962cad"},
+    {file = "types_cachetools-6.2.0.20251022.tar.gz", hash = "sha256:f1d3c736f0f741e89ec10f0e1b0138625023e21eb33603a930c149e0318c0cef"},
+]
+
+[[package]]
 name = "typing-extensions"
 version = "4.15.0"
 description = "Backported and Experimental Type Hints for Python 3.9+"
@@ -2853,4 +2865,4 @@ dev = ["pytest", "setuptools"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.12, <3.14"
-content-hash = "1c5ee5b7660cfeec6ef0d40f8a18c85a1e339ac925d50c02367ddb0e1c402cb2"
+content-hash = "da17e1bad435237915f92fa17bc843f325c6f98d2208c0f20f9e7874bfa834d4"

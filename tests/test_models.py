@@ -14,7 +14,7 @@ def test_aegis_policy_defaults() -> None:
     assert policy.allow_list == []
     assert "PERSON" in policy.entity_types
     assert policy.mode == RedactionMode.REPLACE
-    assert policy.confidence_score == 0.85
+    assert policy.confidence_score == 0.40
 
 
 def test_aegis_policy_custom() -> None:

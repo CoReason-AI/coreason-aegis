@@ -1,3 +1,13 @@
+# Copyright (c) 2025 CoReason, Inc.
+#
+# This software is proprietary and dual-licensed.
+# Licensed under the Prosperity Public License 3.0 (the "License").
+# A copy of the license is available at https://prosperitylicense.com/versions/3.0.0
+# For details, see the LICENSE file.
+# Commercial use beyond a 30-day trial requires a separate license.
+#
+# Source Code: https://github.com/CoReason-AI/coreason_aegis
+
 from typing import Generator
 
 import pytest
@@ -79,3 +89,68 @@ def test_story_a_end_to_end(real_aegis: Aegis) -> None:
 
     expected_final = "Regarding John Doe on 12/01/1980, the rash symptoms..."
     assert final_output == expected_final
+
+
+@pytest.mark.integration
+def test_multi_turn_consistency(real_aegis: Aegis) -> None:
+    """
+    Test Case 1: Consistency across multiple turns.
+    "John Doe" must map to the same token within the session.
+    """
+    session_id = "session_consistency"
+
+    # Turn 1
+    input1 = "John Doe is here."
+    sanitized1, _ = real_aegis.sanitize(input1, session_id)
+    assert "[PATIENT_A]" in sanitized1
+
+    # Turn 2
+    input2 = "Does John Doe have insurance?"
+    sanitized2, _ = real_aegis.sanitize(input2, session_id)
+    # Should reuse [PATIENT_A], not create [PATIENT_B]
+    assert "[PATIENT_A]" in sanitized2
+    assert "[PATIENT_B]" not in sanitized2
+
+
+@pytest.mark.integration
+def test_multiple_identities(real_aegis: Aegis) -> None:
+    """
+    Test Case 2: Multiple distinct entities in the same text.
+    John Doe -> [PATIENT_A]
+    Jane Smith -> [PATIENT_B]
+    """
+    session_id = "session_multiple"
+    text = "John Doe and Jane Smith are meeting."
+
+    sanitized, deid_map = real_aegis.sanitize(text, session_id)
+
+    assert "[PATIENT_A]" in sanitized
+    assert "[PATIENT_B]" in sanitized
+
+    # Check mapping
+    # Note: Order depends on appearance.
+    # John Doe (idx 0) -> A
+    # Jane Smith (idx 13) -> B
+
+    assert deid_map.mappings["[PATIENT_A]"] == "John Doe"
+    assert deid_map.mappings["[PATIENT_B]"] == "Jane Smith"
+
+
+@pytest.mark.integration
+def test_hallucinated_token(real_aegis: Aegis) -> None:
+    """
+    Test Case 3: LLM returns a token that doesn't exist.
+    """
+    session_id = "session_hallucination"
+
+    # Seed the session with one entity
+    real_aegis.sanitize("John Doe", session_id)
+
+    # Simulate LLM returning a non-existent token [PATIENT_X]
+    llm_response = "I spoke with [PATIENT_X] and [PATIENT_A]."
+
+    result = real_aegis.desanitize(llm_response, session_id, authorized=True)
+
+    # [PATIENT_A] should be resolved. [PATIENT_X] should remain.
+    assert "John Doe" in result
+    assert "[PATIENT_X]" in result

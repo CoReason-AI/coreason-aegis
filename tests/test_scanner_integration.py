@@ -6,9 +6,6 @@ from coreason_aegis.scanner import Scanner
 
 @pytest.fixture
 def scanner() -> Scanner:
-    # Reset singleton to ensure fresh initialization with real AnalyzerEngine
-    Scanner._instance = None
-    Scanner._analyzer = None
     return Scanner()
 
 

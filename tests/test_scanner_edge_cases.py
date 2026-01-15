@@ -6,8 +6,6 @@ from coreason_aegis.scanner import Scanner
 
 @pytest.fixture
 def scanner() -> Scanner:
-    Scanner._instance = None
-    Scanner._analyzer = None
     return Scanner()
 
 

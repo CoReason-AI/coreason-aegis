@@ -12,18 +12,20 @@ from coreason_aegis.main import Aegis
 @pytest.fixture
 def mock_scanner_engine() -> Generator[MagicMock, None, None]:
     # Mock the internal AnalyzerEngine to avoid loading models
+    # Patch the class so that if instantiated, it returns a mock.
     with patch("coreason_aegis.scanner.AnalyzerEngine") as mock:
-        yield mock
+        # Crucial: Ensure the module-level cache is None so that Scanner
+        # calls AnalyzerEngine() (hitting our mock) instead of using a cached real instance.
+        with patch("coreason_aegis.scanner._ANALYZER_ENGINE_CACHE", None):
+            yield mock
 
 
 @pytest.fixture
 def aegis(mock_scanner_engine: MagicMock) -> Aegis:
-    # Reset singleton
-    from coreason_aegis.scanner import Scanner
-
-    Scanner._instance = None
-    Scanner._analyzer = None
-
+    # No singleton reset needed for Scanner anymore, but we need to ensure
+    # Aegis uses a fresh scanner (which uses the mocked engine).
+    # Since Aegis() calls Scanner(), and Scanner() uses _get_analyzer_engine(),
+    # and we cleared the cache in mock_scanner_engine, this should work.
     return Aegis()
 
 

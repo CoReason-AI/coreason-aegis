@@ -10,35 +10,45 @@ from coreason_aegis.scanner import Scanner
 
 @pytest.fixture
 def mock_analyzer_engine() -> Generator[MagicMock, None, None]:
+    # We patch the AnalyzerEngine class used inside scanner.py
+    # NOTE: Since scanner.py now uses a module-level cache, we must ensure
+    # the cache is cleared or mocked properly.
+    # However, patching 'coreason_aegis.scanner.AnalyzerEngine' effectively mocks
+    # the class instantiation. But if _ANALYZER_ENGINE_CACHE is already set,
+    # the mock won't be used. So we must clear the cache.
     with patch("coreason_aegis.scanner.AnalyzerEngine") as mock:
-        yield mock
+        # Clear the cache before and after test
+        with patch("coreason_aegis.scanner._ANALYZER_ENGINE_CACHE", None):
+            yield mock
 
 
 @pytest.fixture
 def scanner(mock_analyzer_engine: MagicMock) -> Scanner:
-    # Reset singleton instance for each test
-    Scanner._instance = None
-    Scanner._analyzer = None
     return Scanner()
 
 
 def test_scanner_initialization(mock_analyzer_engine: MagicMock) -> None:
-    Scanner._instance = None
-    Scanner._analyzer = None
     scanner = Scanner()
     assert scanner is not None
     mock_analyzer_engine.assert_called_once()
 
 
-def test_scanner_singleton(mock_analyzer_engine: MagicMock) -> None:
-    # Reset singleton first to ensure clean state
-    Scanner._instance = None
-    Scanner._analyzer = None
-
+def test_scanner_shared_engine(mock_analyzer_engine: MagicMock) -> None:
+    """
+    Verifies that multiple Scanner instances share the same AnalyzerEngine
+    (via module-level caching), but are distinct Scanner objects.
+    """
     s1 = Scanner()
     s2 = Scanner()
-    assert s1 is s2
-    mock_analyzer_engine.assert_called_once()  # Should only be called once
+
+    # Instances are different
+    assert s1 is not s2
+
+    # Engine is shared
+    assert s1.analyzer is s2.analyzer
+
+    # Analyzer initialized only once
+    mock_analyzer_engine.assert_called_once()
 
 
 def test_scan_empty_text(scanner: Scanner) -> None:
@@ -76,24 +86,12 @@ def test_scan_failure_raises_exception(scanner: Scanner, mock_analyzer_engine: M
 
 
 def test_initialization_failure() -> None:
-    # Reset singleton
-    Scanner._instance = None
-    Scanner._analyzer = None
+    # Ensure cache is clear for this test is handled by the fixture logic usually,
+    # but here we need to manually simulate the failure environment without the fixture
+    # interfering or use a specific patch context.
 
-    with patch("coreason_aegis.scanner.AnalyzerEngine", side_effect=Exception("Init failed")):
-        with pytest.raises(RuntimeError, match="Scanner initialization failed"):
-            Scanner()
-
-
-def test_analyzer_property_access_error() -> None:
-    # Simulate a state where _analyzer is None but _instance exists
-    # (should ideally not happen if __new__ handles it, but good for coverage)
-    Scanner._instance = None
-    Scanner._analyzer = None
-
-    with patch("coreason_aegis.scanner.AnalyzerEngine"):
-        s = Scanner()
-        s._analyzer = None  # Manually break it
-
-        with pytest.raises(RuntimeError, match="Scanner not initialized properly"):
-            _ = s.analyzer
+    # We need to ensure _ANALYZER_ENGINE_CACHE is None
+    with patch("coreason_aegis.scanner._ANALYZER_ENGINE_CACHE", None):
+        with patch("coreason_aegis.scanner.AnalyzerEngine", side_effect=Exception("Init failed")):
+            with pytest.raises(RuntimeError, match="Scanner initialization failed"):
+                Scanner()

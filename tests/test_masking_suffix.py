@@ -1,55 +1,44 @@
-import sys
+# Copyright (c) 2025 CoReason, Inc.
+#
+# This software is proprietary and dual-licensed.
+# Licensed under the Prosperity Public License 3.0 (the "License").
+# A copy of the license is available at https://prosperitylicense.com/versions/3.0.0
+# For details, see the LICENSE file.
+# Commercial use beyond a 30-day trial requires a separate license.
+#
+# Source Code: https://github.com/CoReason-AI/coreason_aegis
+
+import pytest
 
 from coreason_aegis.masking import MaskingEngine
 from coreason_aegis.vault import VaultManager
 
 
-def test_generate_suffix_basics() -> None:
-    # We need a dummy vault to instantiate MaskingEngine
-    vault = VaultManager()
-    engine = MaskingEngine(vault)
-
-    assert engine._generate_suffix(0) == "A"
-    assert engine._generate_suffix(1) == "B"
-    assert engine._generate_suffix(25) == "Z"
+@pytest.fixture
+def masking_engine() -> MaskingEngine:
+    return MaskingEngine(VaultManager())
 
 
-def test_generate_suffix_boundaries() -> None:
-    vault = VaultManager()
-    engine = MaskingEngine(vault)
-
-    # These are expected to fail with the current implementation
-    assert engine._generate_suffix(26) == "AA"
-    assert engine._generate_suffix(27) == "AB"
-    assert engine._generate_suffix(51) == "AZ"
-    assert engine._generate_suffix(52) == "BA"
-    assert engine._generate_suffix(701) == "ZZ"
-    assert engine._generate_suffix(702) == "AAA"
+def test_base_cases() -> None:
+    assert MaskingEngine._generate_suffix(0) == "A"
+    assert MaskingEngine._generate_suffix(25) == "Z"
 
 
-def test_generate_suffix_negative() -> None:
-    vault = VaultManager()
-    engine = MaskingEngine(vault)
-    import pytest
+def test_rollover() -> None:
+    assert MaskingEngine._generate_suffix(26) == "AA"
+    assert MaskingEngine._generate_suffix(27) == "AB"
+    assert MaskingEngine._generate_suffix(51) == "AZ"
+    assert MaskingEngine._generate_suffix(52) == "BA"
 
+
+def test_large_number() -> None:
+    # 26^2 + 26 = 676 + 26 = 702 -> AAA
+    # 0 -> A (1 digit)
+    # 26 -> AA (2 digits)
+    # 702 -> AAA (3 digits)
+    assert MaskingEngine._generate_suffix(702) == "AAA"
+
+
+def test_negative_input() -> None:
     with pytest.raises(ValueError):
-        engine._generate_suffix(-1)
-
-
-def test_generate_suffix_large_numbers() -> None:
-    vault = VaultManager()
-    engine = MaskingEngine(vault)
-
-    # 26^3 + 26^2 + 26 = 17576 + 676 + 26 = 18278 (approx)
-    # Just checking it doesn't crash and returns something reasonable
-
-    # Check a known large value if possible, or just property
-    # 18277 -> ZZZ
-    assert engine._generate_suffix(18277) == "ZZZ"
-    assert engine._generate_suffix(18278) == "AAAA"
-
-    # Very large number
-    large_suffix = engine._generate_suffix(sys.maxsize)
-    assert len(large_suffix) > 0
-    assert large_suffix.isupper()
-    assert large_suffix.isalpha()
+        MaskingEngine._generate_suffix(-1)

@@ -1,3 +1,13 @@
+# Copyright (c) 2025 CoReason, Inc.
+#
+# This software is proprietary and dual-licensed.
+# Licensed under the Prosperity Public License 3.0 (the "License").
+# A copy of the license is available at https://prosperitylicense.com/versions/3.0.0
+# For details, see the LICENSE file.
+# Commercial use beyond a 30-day trial requires a separate license.
+#
+# Source Code: https://github.com/CoReason-AI/coreason_aegis
+
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Dict, List
@@ -18,7 +28,8 @@ class AegisPolicy(BaseModel):
         default_factory=lambda: ["PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER", "IP_ADDRESS", "DATE_TIME"]
     )
     mode: RedactionMode = RedactionMode.REPLACE
-    confidence_score: float = 0.85
+    # Lowered confidence score to ensure high recall for things like Dates
+    confidence_score: float = 0.40
 
 
 class DeIdentificationMap(BaseModel):

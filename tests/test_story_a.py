@@ -13,27 +13,17 @@ from typing import Generator
 import pytest
 
 from coreason_aegis.main import Aegis
-from coreason_aegis.scanner import Scanner
 
 
 @pytest.fixture
 def real_aegis() -> Generator[Aegis, None, None]:
     """
     Fixture that provides an Aegis instance with the REAL Scanner (no mocks).
-    Resets the Singleton before and after to ensure isolation.
     """
-    # Reset singleton to ensure we load the real one, not a mock from a previous test
-    Scanner._instance = None
-    Scanner._analyzer = None
-
     # Initializing Aegis triggers Scanner initialization (which loads the heavy model)
     aegis_instance = Aegis()
 
     yield aegis_instance
-
-    # Cleanup after test
-    Scanner._instance = None
-    Scanner._analyzer = None
 
 
 @pytest.mark.integration

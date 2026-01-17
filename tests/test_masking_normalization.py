@@ -26,7 +26,8 @@ def test_standard_normalizations(masking_engine: MaskingEngine) -> None:
     assert MaskingEngine._normalize_entity_type("EMAIL_ADDRESS") == "EMAIL"
     assert MaskingEngine._normalize_entity_type("PHONE_NUMBER") == "PHONE"
     assert MaskingEngine._normalize_entity_type("IP_ADDRESS") == "IP"
-    assert MaskingEngine._normalize_entity_type("SECRET_KEY") == "KEY"
+    # Changed per PRD Story B: SECRET_KEY should redact to [SECRET_KEY], not [KEY]
+    assert MaskingEngine._normalize_entity_type("SECRET_KEY") == "SECRET_KEY"
 
 
 def test_unknown_normalization(masking_engine: MaskingEngine) -> None:

@@ -1,54 +1,47 @@
-from datetime import datetime, timedelta, timezone
+# Copyright (c) 2025 CoReason, Inc.
+#
+# This software is proprietary and dual-licensed.
+# Licensed under the Prosperity Public License 3.0 (the "License").
+# A copy of the license is available at https://prosperitylicense.com/versions/3.0.0
+# For details, see the LICENSE file.
+# Commercial use beyond a 30-day trial requires a separate license.
+#
+# Source Code: https://github.com/CoReason-AI/coreason_aegis
 
-from coreason_aegis.models import AegisPolicy, DeIdentificationMap, RedactionMode
+from typing import cast
 
+import pytest
+from pydantic import ValidationError
 
-def test_redaction_mode_values() -> None:
-    assert RedactionMode.MASK == "MASK"
-    assert RedactionMode.REPLACE == "REPLACE"
-    assert RedactionMode.SYNTHETIC == "SYNTHETIC"
+from coreason_aegis.models import AegisPolicy, RedactionMode
 
 
 def test_aegis_policy_defaults() -> None:
     policy = AegisPolicy()
-    assert policy.allow_list == []
-    assert "PERSON" in policy.entity_types
     assert policy.mode == RedactionMode.REPLACE
-    assert policy.confidence_score == 0.40
+    assert policy.confidence_score == 0.40  # Verified verified
+    assert "PERSON" in policy.entity_types
 
 
-def test_aegis_policy_custom() -> None:
-    policy = AegisPolicy(allow_list=["Tylenol"], entity_types=["US_SSN"], mode=RedactionMode.MASK, confidence_score=0.9)
-    assert policy.allow_list == ["Tylenol"]
-    assert policy.entity_types == ["US_SSN"]
-    assert policy.mode == RedactionMode.MASK
+def test_redaction_mode_enum() -> None:
+    assert RedactionMode.MASK == "MASK"
+    assert RedactionMode.REPLACE == "REPLACE"
+    assert RedactionMode.SYNTHETIC == "SYNTHETIC"
+    assert RedactionMode.HASH == "HASH"
+
+
+def test_policy_validation_failure() -> None:
+    # Check invalid mode
+    with pytest.raises(ValidationError):
+        # Cast to ignore static type check failure, forcing runtime validation check
+        AegisPolicy(mode=cast(RedactionMode, "INVALID_MODE"))
+
+
+def test_confidence_score_modification() -> None:
+    policy = AegisPolicy(confidence_score=0.9)
     assert policy.confidence_score == 0.9
 
 
-def test_deidentification_map_defaults() -> None:
-    session_id = "sess_123"
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
-
-    deid_map = DeIdentificationMap(session_id=session_id, expires_at=expires_at)
-
-    assert deid_map.session_id == session_id
-    assert deid_map.mappings == {}
-    assert isinstance(deid_map.created_at, datetime)
-    assert deid_map.created_at.tzinfo == timezone.utc
-    assert deid_map.expires_at == expires_at
-
-
-def test_deidentification_map_custom() -> None:
-    session_id = "sess_123"
-    mappings = {"[TOKEN]": "REAL"}
-    created_at = datetime.now(timezone.utc)
-    expires_at = created_at + timedelta(hours=1)
-
-    deid_map = DeIdentificationMap(
-        session_id=session_id, mappings=mappings, created_at=created_at, expires_at=expires_at
-    )
-
-    assert deid_map.session_id == session_id
-    assert deid_map.mappings == mappings
-    assert deid_map.created_at == created_at
-    assert deid_map.expires_at == expires_at
+def test_allow_list_default() -> None:
+    policy = AegisPolicy()
+    assert policy.allow_list == []

@@ -8,7 +8,7 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_aegis
 
-import logging
+import json
 from typing import Generator, List
 
 import pytest
@@ -76,3 +76,93 @@ def test_credential_exposure_attempt(real_aegis: Aegis, capture_logs: List[str])
             break
 
     assert found_warning, "Expected 'Credential Exposure Attempt' warning log not found."
+
+
+@pytest.mark.integration
+def test_multiple_credentials(real_aegis: Aegis, capture_logs: List[str]) -> None:
+    """
+    Verifies detection of multiple distinct API keys in a single input.
+    """
+    key_1 = "sk-11111abcdefghijklmnopqrstuvwxyz"
+    key_2 = "sk-22222abcdefghijklmnopqrstuvwxyz"
+    user_prompt = f"Keys: {key_1} and {key_2}"
+    session_id = "session_story_b_multi"
+
+    sanitized, deid_map = real_aegis.sanitize(user_prompt, session_id)
+
+    assert key_1 not in sanitized
+    assert key_2 not in sanitized
+    assert "[SECRET_KEY_A]" in sanitized
+    assert "[SECRET_KEY_B]" in sanitized
+
+    # Check logs: Should have warnings.
+    warning_count = sum(1 for msg in capture_logs if "Credential Exposure Attempt" in msg)
+    assert warning_count >= 1
+
+
+@pytest.mark.integration
+def test_credential_in_json(real_aegis: Aegis, capture_logs: List[str]) -> None:
+    """
+    Verifies detection of API keys embedded within a JSON string.
+    """
+    api_key = "sk-json12345abcdefghijklmnop"
+    payload = {
+        "config": {
+            "api_key": api_key,
+            "timeout": 30
+        }
+    }
+    user_prompt = json.dumps(payload)
+    session_id = "session_story_b_json"
+
+    sanitized, _ = real_aegis.sanitize(user_prompt, session_id)
+
+    assert api_key not in sanitized
+    assert "[SECRET_KEY_A]" in sanitized
+
+    # Verify the JSON structure is preserved (roughly)
+    assert '"api_key": "[SECRET_KEY_A]"' in sanitized
+
+
+@pytest.mark.integration
+def test_false_positive_credential(real_aegis: Aegis) -> None:
+    """
+    Verifies that short strings starting with 'sk-' are NOT detected as keys.
+    """
+    # Too short (scanner expects sk- + 20 chars)
+    safe_text = "The skier (sk-ier) went down the slope."
+    session_id = "session_story_b_fp"
+
+    sanitized, _ = real_aegis.sanitize(safe_text, session_id)
+
+    # Should remain unchanged
+    assert sanitized == safe_text
+    assert "[SECRET_KEY_A]" not in sanitized
+
+
+@pytest.mark.integration
+def test_mixed_pii_and_credential(real_aegis: Aegis, capture_logs: List[str]) -> None:
+    """
+    Verifies correct handling of standard PII alongside credentials.
+    """
+    api_key = "sk-mixed12345abcdefghijklmn"
+    user_prompt = f"John Doe posted {api_key} on 01/01/2025."
+    session_id = "session_story_b_mixed"
+
+    sanitized, deid_map = real_aegis.sanitize(user_prompt, session_id)
+
+    # Debugging aid: Print detected entities if assertion fails
+    print(f"\nDEBUG: Sanitized: '{sanitized}'")
+    print(f"DEBUG: Mappings: {deid_map.mappings}")
+
+    # PII Check
+    assert "John Doe" not in sanitized
+    assert "[PATIENT_A]" in sanitized
+
+    assert "01/01/2025" not in sanitized
+    # Date logic might assign [DATE_A]
+    assert "[DATE_A]" in sanitized
+
+    # Key Check
+    assert api_key not in sanitized
+    assert "[SECRET_KEY_A]" in sanitized

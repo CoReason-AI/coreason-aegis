@@ -9,7 +9,7 @@
 # Source Code: https://github.com/CoReason-AI/coreason_aegis
 
 import json
-from typing import Generator, List
+from typing import Any, Generator, List
 
 import pytest
 from loguru import logger as loguru_logger
@@ -35,7 +35,7 @@ def capture_logs() -> Generator[List[str], None, None]:
     """
     logs = []
 
-    def sink(message):
+    def sink(message: Any) -> None:
         logs.append(message.record["message"])
 
     handler_id = loguru_logger.add(sink, level="WARNING")
@@ -106,12 +106,7 @@ def test_credential_in_json(real_aegis: Aegis, capture_logs: List[str]) -> None:
     Verifies detection of API keys embedded within a JSON string.
     """
     api_key = "sk-json12345abcdefghijklmnop"
-    payload = {
-        "config": {
-            "api_key": api_key,
-            "timeout": 30
-        }
-    }
+    payload = {"config": {"api_key": api_key, "timeout": 30}}
     user_prompt = json.dumps(payload)
     session_id = "session_story_b_json"
 
@@ -150,10 +145,6 @@ def test_mixed_pii_and_credential(real_aegis: Aegis, capture_logs: List[str]) ->
     session_id = "session_story_b_mixed"
 
     sanitized, deid_map = real_aegis.sanitize(user_prompt, session_id)
-
-    # Debugging aid: Print detected entities if assertion fails
-    print(f"\nDEBUG: Sanitized: '{sanitized}'")
-    print(f"DEBUG: Mappings: {deid_map.mappings}")
 
     # PII Check
     assert "John Doe" not in sanitized

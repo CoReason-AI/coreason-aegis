@@ -171,7 +171,7 @@ class MaskingEngine:
         elif entity_type == "IP_ADDRESS":
             return "IP"
         elif entity_type == "SECRET_KEY":
-            return "KEY"
+            return "SECRET_KEY"
         return entity_type
 
     @staticmethod

@@ -188,8 +188,8 @@ def test_story_b_leak_prevention(aegis: Aegis, mock_scanner_engine: MagicMock, l
     masked_text, _ = aegis.sanitize(text, session_id)
 
     # Verify masking
-    # [KEY_A]
-    assert "[KEY_A]" in masked_text
+    # [SECRET_KEY_A]
+    assert "[SECRET_KEY_A]" in masked_text
     assert "sk-12345" not in masked_text
 
     # Verify Alert

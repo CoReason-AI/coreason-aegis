@@ -45,6 +45,31 @@ def test_standard_entity_detection(scanner: Scanner) -> None:
 
 
 @pytest.mark.integration
+def test_location_detection(scanner: Scanner) -> None:
+    """
+    Verifies that 'LOCATION' entities are detected correctly.
+    """
+    text = "Dr. John Doe works in Los Angeles."
+    # Use default policy logic but explicit for test clarity
+    policy = AegisPolicy(
+        entity_types=["PERSON", "LOCATION"],
+        confidence_score=0.4,
+    )
+
+    results = scanner.scan(text, policy)
+
+    detected_types = {r.entity_type for r in results}
+    detected_text = {text[r.start : r.end] for r in results}
+
+    assert "PERSON" in detected_types
+    assert "LOCATION" in detected_types
+
+    assert "John Doe" in detected_text
+    # Presidio/Spacy usually detects "Los Angeles"
+    assert "Los Angeles" in detected_text
+
+
+@pytest.mark.integration
 def test_complex_mixed_scenario(scanner: Scanner) -> None:
     """
     Tests a complex scenario with mixed custom and standard entities,

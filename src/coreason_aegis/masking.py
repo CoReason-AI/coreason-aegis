@@ -138,14 +138,56 @@ class MaskingEngine:
             return cast(str, cast(Any, self.faker.ipv4()))
         elif entity_type == "DATE_TIME":
             return cast(str, cast(Any, self.faker.date()))
-        else:
-            # Fallback for custom entities or unknown standard ones
-            # For things like MRN, maybe random digits?
-            # Or just return a placeholder + random string?
-            # Let's try to be smart or generic.
-            if "ID" in entity_type or "NUMBER" in entity_type or "MRN" in entity_type:
-                return str(self.faker.random_number(digits=8))
+        elif entity_type == "MRN":
+            # 6-10 digits
+            # We'll pick 8 digits as a safe default
+            return str(self.faker.random_number(digits=8, fix_len=True))
+        elif entity_type == "PROTOCOL_ID":
+            # [A-Z]{3}-\d{3}
+            # Faker doesn't have a direct provider for this, so we build it.
+            # Use random_uppercase_letter and random_number
+            letters = "".join(self.faker.random_letters(length=3)).upper()
+            digits = str(self.faker.random_number(digits=3, fix_len=True))
+            return f"{letters}-{digits}"
+        elif entity_type == "LOT_NUMBER":
+            # LOT-[A-Z0-9]+
+            # Let's generate LOT-[A-Z]{2}\d{2} for simplicity and realism
+            suffix_part = "".join(self.faker.random_letters(length=2)).upper()
+            digits_part = str(self.faker.random_number(digits=2, fix_len=True))
+            return f"LOT-{suffix_part}{digits_part}"
+        elif entity_type == "GENE_SEQUENCE":
+            # Sequence of ATCG.
+            # Match length of input if possible? Or just fixed?
+            # Input text is passed to this method.
+            # Let's try to match the length of the original text, or default to 10 if too short.
+            length = max(len(text), 10)
+            # Efficiently generate sequence
+            # random.choices is not seeded by faker.seed_instance?
+            # Faker has random_choices or similar.
+            # Actually, self.faker.random.choices works and uses the seeded random instance.
+            bases = ["A", "T", "C", "G"]
+            return "".join(self.faker.random_elements(elements=bases, length=length, unique=False))
+        elif entity_type == "CHEMICAL_CAS":
+            # \d{2,7}-\d{2}-\d
+            # Let's generate roughly: 5 digits - 2 digits - 1 digit
+            part1 = str(self.faker.random_number(digits=5, fix_len=True))
+            part2 = str(self.faker.random_number(digits=2, fix_len=True))
+            part3 = str(self.faker.random_digit())
+            return f"{part1}-{part2}-{part3}"
+        elif entity_type == "SECRET_KEY":
+            # sk-[A-Za-z0-9]{20,}
+            # Generate 24 chars suffix
+            suffix = "".join(self.faker.random_letters(length=24))
+            # random_letters might return only letters. We want alphanumeric.
+            # random_elements with string.ascii_letters + digits is better.
+            import string
 
+            chars = string.ascii_letters + string.digits
+            suffix = "".join(self.faker.random_elements(elements=list(chars), length=24, unique=False))
+            return f"sk-{suffix}"
+
+        else:
+            # Fallback for unknown standard ones
             # Use a generic word
             return cast(str, cast(Any, self.faker.word()))
 

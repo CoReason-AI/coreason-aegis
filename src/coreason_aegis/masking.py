@@ -51,7 +51,24 @@ class MaskingEngine:
 
         # Sort results by start index ascending for deterministic token assignment
         # (Person appearing first gets A, second gets B...)
-        sorted_results_asc = sorted(results, key=lambda x: x.start)
+        # Also handle overlap: If two entities overlap, we must pick one.
+        # We sort by start ASC, then by length DESC to prefer longer matches if they start at same position.
+        # However, if one starts later but overlaps, we skip it.
+        sorted_results_asc = sorted(results, key=lambda x: (x.start, -(x.end - x.start)))
+
+        # Filter overlaps
+        filtered_results: List[RecognizerResult] = []
+        last_end = -1
+        for res in sorted_results_asc:
+            if res.start >= last_end:
+                filtered_results.append(res)
+                last_end = res.end
+            else:
+                # This result overlaps with the previous one. Skip it.
+                # Example: "on 01/01/2025" (start 43, end 57) vs "01/01/2025" (start 47, end 57)
+                # If "on..." comes first (start 43), we keep it. "01..." (start 47) is < 57, so skip.
+                # This prevents replacing text that has already been accounted for.
+                pass
 
         # Reverse lookup: Real Value -> Token
         real_to_token: Dict[str, str] = {v: k for k, v in deid_map.mappings.items()}
@@ -60,7 +77,7 @@ class MaskingEngine:
         # We store the determined replacement for each result to apply later
         replacements: List[Tuple[int, int, str]] = []
 
-        for result in sorted_results_asc:
+        for result in filtered_results:
             entity_text = text[result.start : result.end]
 
             # Check policy Allow List

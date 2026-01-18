@@ -25,7 +25,14 @@ class RedactionMode(str, Enum):
 class AegisPolicy(BaseModel):
     allow_list: List[str] = Field(default_factory=list)  # Terms to NEVER redact (e.g. "Tylenol")
     entity_types: List[str] = Field(
-        default_factory=lambda: ["PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER", "IP_ADDRESS", "DATE_TIME"]
+        default_factory=lambda: [
+            "PERSON",
+            "EMAIL_ADDRESS",
+            "PHONE_NUMBER",
+            "IP_ADDRESS",
+            "DATE_TIME",
+            "SECRET_KEY",
+        ]
     )
     mode: RedactionMode = RedactionMode.REPLACE
     # Lowered confidence score to ensure high recall for things like Dates.

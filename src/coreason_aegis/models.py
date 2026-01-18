@@ -31,6 +31,7 @@ class AegisPolicy(BaseModel):
             "PHONE_NUMBER",
             "IP_ADDRESS",
             "DATE_TIME",
+            "LOCATION",
             "SECRET_KEY",
         ]
     )

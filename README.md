@@ -23,6 +23,11 @@ bidirectional privacy filter that sits between the CoReason platform and the ext
     poetry install
     ```
 
+3.  Download the required Spacy model:
+    ```sh
+    poetry run python -m spacy download en_core_web_lg
+    ```
+
 ### Usage
 
 -   Run the linter:

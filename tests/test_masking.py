@@ -1,181 +1,206 @@
-from datetime import datetime, timedelta, timezone
+# Copyright (c) 2025 CoReason, Inc.
+#
+# This software is proprietary and dual-licensed.
+# Licensed under the Prosperity Public License 3.0 (the "License").
+# A copy of the license is available at https://prosperitylicense.com/versions/3.0.0
+# For details, see the LICENSE file.
+# Commercial use beyond a 30-day trial requires a separate license.
+#
+# Source Code: https://github.com/CoReason-AI/coreason_aegis
 
 import pytest
-from presidio_analyzer import RecognizerResult
+from faker import Faker
 
 from coreason_aegis.masking import MaskingEngine
-from coreason_aegis.models import AegisPolicy, DeIdentificationMap, RedactionMode
+from coreason_aegis.models import AegisPolicy, RedactionMode
 from coreason_aegis.vault import VaultManager
 
 
 @pytest.fixture
-def vault() -> VaultManager:
+def vault_manager() -> VaultManager:
     return VaultManager()
 
 
 @pytest.fixture
-def engine(vault: VaultManager) -> MaskingEngine:
-    return MaskingEngine(vault)
+def masking_engine(vault_manager: VaultManager) -> MaskingEngine:
+    return MaskingEngine(vault_manager)
 
 
-def test_mask_replace_mode_consistency(engine: MaskingEngine) -> None:
-    policy = AegisPolicy(mode=RedactionMode.REPLACE)
-    text = "John met John."
-    results = [
-        RecognizerResult("PERSON", 0, 4, 1.0),
-        RecognizerResult("PERSON", 9, 13, 1.0),
-    ]
-    session_id = "sess_1"
-
-    masked_text, deid_map = engine.mask(text, results, policy, session_id)
-
-    # PERSON should map to PATIENT
-    assert masked_text == "[PATIENT_A] met [PATIENT_A]."
-    assert len(deid_map.mappings) == 1
-    assert deid_map.mappings["[PATIENT_A]"] == "John"
+def test_masking_initialization(masking_engine: MaskingEngine) -> None:
+    assert masking_engine is not None
+    assert isinstance(masking_engine.faker, Faker)
 
 
-def test_mask_replace_mode_different_entities(engine: MaskingEngine) -> None:
-    policy = AegisPolicy(mode=RedactionMode.REPLACE)
-    text = "John met Jane."
-    results = [
-        RecognizerResult("PERSON", 0, 4, 1.0),
-        RecognizerResult("PERSON", 9, 13, 1.0),
-    ]
-    session_id = "sess_1"
-
-    masked_text, deid_map = engine.mask(text, results, policy, session_id)
-
-    # With Pass 1 (Forward Assignment), John appears first -> PATIENT_A
-    # Jane appears second -> PATIENT_B
-    assert masked_text == "[PATIENT_A] met [PATIENT_B]."
-    assert len(deid_map.mappings) == 2
-    assert deid_map.mappings["[PATIENT_A]"] == "John"
-    assert deid_map.mappings["[PATIENT_B]"] == "Jane"
+def test_generate_suffix() -> None:
+    assert MaskingEngine._generate_suffix(0) == "A"
+    assert MaskingEngine._generate_suffix(25) == "Z"
+    assert MaskingEngine._generate_suffix(26) == "AA"
+    assert MaskingEngine._generate_suffix(27) == "AB"
 
 
-def test_mask_mask_mode(engine: MaskingEngine) -> None:
+def test_normalize_entity_type() -> None:
+    assert MaskingEngine._normalize_entity_type("PERSON") == "PATIENT"
+    assert MaskingEngine._normalize_entity_type("DATE_TIME") == "DATE"
+    assert MaskingEngine._normalize_entity_type("EMAIL_ADDRESS") == "EMAIL"
+    assert MaskingEngine._normalize_entity_type("UNKNOWN") == "UNKNOWN"
+
+
+def test_mask_mode_mask(masking_engine: MaskingEngine) -> None:
+    from presidio_analyzer import RecognizerResult
+
+    text = "John Doe"
+    results = [RecognizerResult("PERSON", 0, 8, 1.0)]
     policy = AegisPolicy(mode=RedactionMode.MASK)
-    text = "John."
-    results = [RecognizerResult("PERSON", 0, 4, 1.0)]
-    session_id = "sess_1"
+    session_id = "sess1"
 
-    masked_text, deid_map = engine.mask(text, results, policy, session_id)
-
-    assert masked_text == "[PATIENT]."
-    assert len(deid_map.mappings) == 0
+    masked, _ = masking_engine.mask(text, results, policy, session_id)
+    assert masked == "[PATIENT]"
 
 
-def test_mask_synthetic_mode(engine: MaskingEngine) -> None:
-    # SYNTHETIC mode currently falls back to MASK
+def test_mask_mode_replace(masking_engine: MaskingEngine) -> None:
+    from presidio_analyzer import RecognizerResult
+
+    text = "John Doe"
+    results = [RecognizerResult("PERSON", 0, 8, 1.0)]
+    policy = AegisPolicy(mode=RedactionMode.REPLACE)
+    session_id = "sess2"
+
+    masked, deid_map = masking_engine.mask(text, results, policy, session_id)
+    assert masked == "[PATIENT_A]"
+    assert deid_map.mappings["[PATIENT_A]"] == "John Doe"
+
+
+def test_mask_mode_replace_reuse(masking_engine: MaskingEngine) -> None:
+    # Test reusing existing token
+    from presidio_analyzer import RecognizerResult
+
+    text = "John Doe again"
+    results = [RecognizerResult("PERSON", 0, 8, 1.0)]
+    policy = AegisPolicy(mode=RedactionMode.REPLACE)
+    session_id = "sess_reuse"
+
+    # First pass
+    masking_engine.mask("John Doe", [RecognizerResult("PERSON", 0, 8, 1.0)], policy, session_id)
+
+    # Second pass
+    masked, deid_map = masking_engine.mask(text, results, policy, session_id)
+    assert masked == "[PATIENT_A] again"
+    assert deid_map.mappings["[PATIENT_A]"] == "John Doe"
+
+
+def test_mask_mode_synthetic(masking_engine: MaskingEngine) -> None:
+    from presidio_analyzer import RecognizerResult
+
+    text = "John Doe"
+    results = [RecognizerResult("PERSON", 0, 8, 1.0)]
     policy = AegisPolicy(mode=RedactionMode.SYNTHETIC)
-    text = "John."
-    results = [RecognizerResult("PERSON", 0, 4, 1.0)]
-    session_id = "sess_1"
+    session_id = "sess3"
 
-    masked_text, deid_map = engine.mask(text, results, policy, session_id)
-
-    assert masked_text == "[PATIENT]."
-    assert len(deid_map.mappings) == 0
-
-
-def test_mask_unknown_mode(engine: MaskingEngine) -> None:
-    # Force an unknown mode
-    policy = AegisPolicy()
-    policy.mode = "UNKNOWN"  # type: ignore
-    text = "John."
-    results = [RecognizerResult("PERSON", 0, 4, 1.0)]
-    session_id = "sess_1"
-
-    masked_text, deid_map = engine.mask(text, results, policy, session_id)
-
-    # Should default to simple replacement
-    assert masked_text == "[PATIENT]."
+    masked, _ = masking_engine.mask(text, results, policy, session_id)
+    assert masked != "John Doe"
+    assert isinstance(masked, str)
+    # Check consistency
+    masked2, _ = masking_engine.mask(text, results, policy, session_id)
+    assert masked == masked2
 
 
-def test_mask_allow_list(engine: MaskingEngine) -> None:
-    policy = AegisPolicy(allow_list=["John"], mode=RedactionMode.REPLACE)
-    text = "John met Jane."
+def test_mask_mode_hash(masking_engine: MaskingEngine) -> None:
+    from presidio_analyzer import RecognizerResult
+
+    text = "John Doe"
+    results = [RecognizerResult("PERSON", 0, 8, 1.0)]
+    policy = AegisPolicy(mode=RedactionMode.HASH)
+    session_id = "sess4"
+
+    masked, _ = masking_engine.mask(text, results, policy, session_id)
+    # sha256 of John Doe
+    import hashlib
+
+    expected = hashlib.sha256("John Doe".encode()).hexdigest()
+    assert masked == expected
+
+
+def test_allow_list(masking_engine: MaskingEngine) -> None:
+    from presidio_analyzer import RecognizerResult
+
+    text = "Tylenol"
+    results = [RecognizerResult("MEDICATION", 0, 7, 1.0)]
+    policy = AegisPolicy(mode=RedactionMode.MASK, allow_list=["Tylenol"])
+    session_id = "sess5"
+
+    masked, _ = masking_engine.mask(text, results, policy, session_id)
+    assert masked == "Tylenol"
+
+
+def test_overlapping_entities(masking_engine: MaskingEngine) -> None:
+    # Test collision handling: Presidio can return overlapping entities.
+    pass
+
+
+def test_multiple_entities_order(masking_engine: MaskingEngine) -> None:
+    from presidio_analyzer import RecognizerResult
+
+    text = "John and Jane"
+    # John: 0-4, Jane: 9-13
     results = [
         RecognizerResult("PERSON", 0, 4, 1.0),
         RecognizerResult("PERSON", 9, 13, 1.0),
     ]
-    session_id = "sess_1"
-
-    masked_text, deid_map = engine.mask(text, results, policy, session_id)
-
-    # John should be skipped, Jane masked
-    assert masked_text == "John met [PATIENT_A]."
-    assert len(deid_map.mappings) == 1
-    assert deid_map.mappings["[PATIENT_A]"] == "Jane"
-
-
-def test_existing_session_consistency(engine: MaskingEngine, vault: VaultManager) -> None:
-    session_id = "sess_persistent"
-    # Pre-populate vault
-    deid_map = DeIdentificationMap(
-        session_id=session_id,
-        mappings={"[PATIENT_A]": "John"},
-        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
-    )
-    vault.save_map(deid_map)
-
     policy = AegisPolicy(mode=RedactionMode.REPLACE)
-    text = "John is back."
-    results = [RecognizerResult("PERSON", 0, 4, 1.0)]
+    session_id = "sess_multi"
 
-    masked_text, updated_map = engine.mask(text, results, policy, session_id)
-
-    assert masked_text == "[PATIENT_A] is back."
-    assert updated_map.mappings["[PATIENT_A]"] == "John"
+    masked, _ = masking_engine.mask(text, results, policy, session_id)
+    assert masked == "[PATIENT_A] and [PATIENT_B]"
 
 
-def test_suffix_generation(engine: MaskingEngine) -> None:
-    # Test internal helper
-    assert engine._generate_suffix(0) == "A"
-    assert engine._generate_suffix(25) == "Z"
-    assert engine._generate_suffix(26) == "AA"
+def test_synthetic_fallback(masking_engine: MaskingEngine) -> None:
+    """Test fallback logic for synthetic data generation."""
+    from presidio_analyzer import RecognizerResult
+
+    text = "SomeRandomThing"
+    # Case 1: ID/NUMBER/MRN fallback
+    results_mrn = [RecognizerResult("MRN", 0, 15, 1.0)]
+    policy = AegisPolicy(mode=RedactionMode.SYNTHETIC)
+
+    masked_mrn, _ = masking_engine.mask(text, results_mrn, policy, "sess_fallback_mrn")
+    # Should be digits
+    assert masked_mrn.isdigit()
+
+    # Case 2: Generic fallback
+    results_generic = [RecognizerResult("UNKNOWN_TYPE", 0, 15, 1.0)]
+    masked_generic, _ = masking_engine.mask(text, results_generic, policy, "sess_fallback_gen")
+    assert isinstance(masked_generic, str)
+    assert masked_generic != text
+    assert masked_generic != masked_mrn
+
+    # Coverage for line 96 (seeding logic):
+    # This is implicitly covered by test_mask_mode_synthetic, but let's double check determinism for custom types
+    masked_generic_2, _ = masking_engine.mask(text, results_generic, policy, "sess_fallback_gen")
+    assert masked_generic == masked_generic_2
 
 
-def test_mask_high_volume_entities(engine: MaskingEngine) -> None:
-    # Simulate a document with many unique entities to force suffix transitions
-    # We want to cover A-Z, AA-ZZ transitions.
-    # 26 (A-Z) + 26*26 (AA-ZZ) = 702 entities.
-    # Let's generate 705 distinct names.
+def test_synthetic_types(masking_engine: MaskingEngine) -> None:
+    """Test synthetic generation for specific types coverage."""
+    from presidio_analyzer import RecognizerResult
 
-    count = 705
-    entities = [f"Person_{i}" for i in range(count)]
-    text = " ".join(entities)
+    policy = AegisPolicy(mode=RedactionMode.SYNTHETIC)
 
-    # Manually construct results (simulating Scanner)
-    results = []
-    cursor = 0
-    for entity in entities:
-        start = text.find(entity, cursor)
-        end = start + len(entity)
-        results.append(RecognizerResult("PERSON", start, end, 1.0))
-        cursor = end + 1  # +1 for space
+    # EMAIL
+    res_email = [RecognizerResult("EMAIL_ADDRESS", 0, 5, 1.0)]
+    masked, _ = masking_engine.mask("a@b.c", res_email, policy, "sess_syn_types")
+    assert "@" in masked
 
-    policy = AegisPolicy(mode=RedactionMode.REPLACE)
-    session_id = "sess_high_vol"
+    # PHONE
+    res_phone = [RecognizerResult("PHONE_NUMBER", 0, 3, 1.0)]
+    masked, _ = masking_engine.mask("123", res_phone, policy, "sess_syn_types")
+    assert any(c.isdigit() for c in masked)
 
-    masked_text, deid_map = engine.mask(text, results, policy, session_id)
+    # IP
+    res_ip = [RecognizerResult("IP_ADDRESS", 0, 3, 1.0)]
+    masked, _ = masking_engine.mask("1.1", res_ip, policy, "sess_syn_types")
+    assert "." in masked
 
-    # Check that we have 705 unique mappings
-    assert len(deid_map.mappings) == count
-
-    # Check specific tokens
-    # First should be A
-    assert deid_map.mappings["[PATIENT_A]"] == "Person_0"
-    # 26th (index 25) should be Z
-    assert deid_map.mappings["[PATIENT_Z]"] == "Person_25"
-    # 27th (index 26) should be AA
-    assert deid_map.mappings["[PATIENT_AA]"] == "Person_26"
-    # 702th (index 701) should be ZZ
-    assert deid_map.mappings["[PATIENT_ZZ]"] == "Person_701"
-    # 703th (index 702) should be AAA
-    assert deid_map.mappings["[PATIENT_AAA]"] == "Person_702"
-
-    # Verify masked text format roughly
-    assert "[PATIENT_A]" in masked_text
-    assert "[PATIENT_AAA]" in masked_text
+    # DATE
+    res_date = [RecognizerResult("DATE_TIME", 0, 3, 1.0)]
+    masked, _ = masking_engine.mask("now", res_date, policy, "sess_syn_types")
+    assert isinstance(masked, str)

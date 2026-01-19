@@ -9,14 +9,14 @@
 # Source Code: https://github.com/CoReason-AI/coreason_aegis
 
 import logging
-from typing import Generator
+from typing import AsyncGenerator, Generator
 from unittest.mock import MagicMock, patch
 
 import pytest
 from loguru import logger
 from presidio_analyzer import RecognizerResult
 
-from coreason_aegis.main import Aegis
+from coreason_aegis.main import Aegis, AegisAsync
 
 
 @pytest.fixture
@@ -37,6 +37,12 @@ def aegis(mock_scanner_engine: MagicMock) -> Aegis:
     # Since Aegis() calls Scanner(), and Scanner() uses _get_analyzer_engine(),
     # and we cleared the cache in mock_scanner_engine, this should work.
     return Aegis()
+
+
+@pytest.fixture
+async def aegis_async(mock_scanner_engine: MagicMock) -> AsyncGenerator[AegisAsync, None]:
+    async with AegisAsync() as svc:
+        yield svc
 
 
 @pytest.fixture
@@ -73,7 +79,28 @@ def test_sanitize_flow(aegis: Aegis, mock_scanner_engine: MagicMock) -> None:
     text = "John has a secret."
     session_id = "sess_main_1"
 
-    masked_text, deid_map = aegis.sanitize(text, session_id)
+    with aegis:
+        masked_text, deid_map = aegis.sanitize(text, session_id)
+
+    # Check masking occurred
+    assert masked_text == "[PATIENT_A] has a secret."
+    assert deid_map.mappings["[PATIENT_A]"] == "John"
+
+    # Verify scan call
+    mock_instance.analyze.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_sanitize_flow_async(aegis_async: AegisAsync, mock_scanner_engine: MagicMock) -> None:
+    # Setup mock scanner results
+    mock_instance = mock_scanner_engine.return_value
+    mock_results = [RecognizerResult("PERSON", 0, 4, 1.0)]  # "John"
+    mock_instance.analyze.return_value = mock_results
+
+    text = "John has a secret."
+    session_id = "sess_main_1_async"
+
+    masked_text, deid_map = await aegis_async.sanitize(text, session_id)
 
     # Check masking occurred
     assert masked_text == "[PATIENT_A] has a secret."
@@ -91,11 +118,12 @@ def test_desanitize_flow_authorized(aegis: Aegis, mock_scanner_engine: MagicMock
 
     text = "John"
     session_id = "sess_main_2"
-    aegis.sanitize(text, session_id)
+    with aegis:
+        aegis.sanitize(text, session_id)
 
-    # Now desanitize
-    llm_response = "Hello [PATIENT_A]."
-    result = aegis.desanitize(llm_response, session_id, authorized=True)
+        # Now desanitize
+        llm_response = "Hello [PATIENT_A]."
+        result = aegis.desanitize(llm_response, session_id, authorized=True)
 
     assert result == "Hello John."
 
@@ -108,11 +136,13 @@ def test_desanitize_flow_unauthorized(aegis: Aegis, mock_scanner_engine: MagicMo
 
     text = "John"
     session_id = "sess_main_3"
-    aegis.sanitize(text, session_id)
 
-    # Now desanitize
-    llm_response = "Hello [PATIENT_A]."
-    result = aegis.desanitize(llm_response, session_id, authorized=False)
+    with aegis:
+        aegis.sanitize(text, session_id)
+
+        # Now desanitize
+        llm_response = "Hello [PATIENT_A]."
+        result = aegis.desanitize(llm_response, session_id, authorized=False)
 
     assert result == "Hello [PATIENT_A]."
 
@@ -121,8 +151,9 @@ def test_sanitize_fail_closed(aegis: Aegis, mock_scanner_engine: MagicMock) -> N
     mock_instance = mock_scanner_engine.return_value
     mock_instance.analyze.side_effect = Exception("Critical Failure")
 
-    with pytest.raises(RuntimeError, match="Scan operation failed"):
-        aegis.sanitize("input", "sess_fail")
+    with aegis:
+        with pytest.raises(RuntimeError, match="Scan operation failed"):
+            aegis.sanitize("input", "sess_fail")
 
 
 def test_story_a_safe_consultation(aegis: Aegis, mock_scanner_engine: MagicMock) -> None:
@@ -146,29 +177,32 @@ def test_story_a_safe_consultation(aegis: Aegis, mock_scanner_engine: MagicMock)
     user_prompt = "Patient John Doe (DOB: 12/01/1980) has a rash."
     session_id = "story_a"
 
-    # 1. Sanitize
-    sanitized_prompt, _ = aegis.sanitize(user_prompt, session_id)
+    with aegis:
+        # 1. Sanitize
+        sanitized_prompt, _ = aegis.sanitize(user_prompt, session_id)
 
-    # Expect: "Patient [PATIENT_A] (DOB: [DATE_A]) has a rash."
-    # Note: Our default policy uses REPLACE.
-    assert "[PATIENT_A]" in sanitized_prompt
-    assert "[DATE_A]" in sanitized_prompt
-    assert "John Doe" not in sanitized_prompt
+        # Expect: "Patient [PATIENT_A] (DOB: [DATE_A]) has a rash."
+        # Note: Our default policy uses REPLACE.
+        assert "[PATIENT_A]" in sanitized_prompt
+        assert "[DATE_A]" in sanitized_prompt
+        assert "John Doe" not in sanitized_prompt
 
-    # 2. LLM Response
-    llm_response = "For [PATIENT_A], considering the rash..."
+        # 2. LLM Response
+        llm_response = "For [PATIENT_A], considering the rash..."
 
-    # 3. Desanitize
-    final_output = aegis.desanitize(llm_response, session_id, authorized=True)
+        # 3. Desanitize
+        final_output = aegis.desanitize(llm_response, session_id, authorized=True)
 
     assert final_output == "For John Doe, considering the rash..."
 
 
 def test_desanitize_exception(aegis: Aegis, mock_scanner_engine: MagicMock) -> None:
     # Force exception during re-identification
-    with patch.object(aegis.reidentifier, "reidentify", side_effect=Exception("Re-id error")):
-        with pytest.raises(Exception, match="Re-id error"):
-            aegis.desanitize("text", "sess_err")
+    # Note: reidentifier is in _async.reidentifier
+    with aegis:
+        with patch.object(aegis._async.reidentifier, "reidentify", side_effect=Exception("Re-id error")):
+            with pytest.raises(Exception, match="Re-id error"):
+                aegis.desanitize("text", "sess_err")
 
 
 def test_story_b_leak_prevention(aegis: Aegis, mock_scanner_engine: MagicMock, log_sink: list[str]) -> None:
@@ -184,8 +218,9 @@ def test_story_b_leak_prevention(aegis: Aegis, mock_scanner_engine: MagicMock, l
     text = "Here is the API Key: sk-1234567890abcdef12345."
     session_id = "story_b"
 
-    # Run sanitize
-    masked_text, _ = aegis.sanitize(text, session_id)
+    with aegis:
+        # Run sanitize
+        masked_text, _ = aegis.sanitize(text, session_id)
 
     # Verify masking
     # [SECRET_KEY_A]

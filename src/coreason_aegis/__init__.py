@@ -12,10 +12,10 @@
 bidirectional privacy filter that sits between the CoReason platform and the external world
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __author__ = "Gowtham A Rao"
 __email__ = "gowtham.rao@coreason.ai"
 
-from .main import Aegis
+from .main import Aegis, AegisAsync
 
-__all__ = ["Aegis"]
+__all__ = ["Aegis", "AegisAsync"]

@@ -39,7 +39,7 @@ class VaultManager:
         """Initializes the VaultManager.
 
         Args:
-            ttl_seconds: Time to live in seconds. Default 1 hour.
+            ttl_seconds: Time to live in seconds for each mapping. Default 1 hour.
             max_size: Maximum number of items in the cache. Default 10000.
             timer: Timer function for TTL. Defaults to time.monotonic.
         """

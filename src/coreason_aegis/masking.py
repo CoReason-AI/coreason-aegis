@@ -78,7 +78,6 @@ class MaskingEngine:
         # (Person appearing first gets A, second gets B...)
         # Also handle overlap: If two entities overlap, we must pick one.
         # We sort by start ASC, then by length DESC to prefer longer matches if they start at same position.
-        # However, if one starts later but overlaps, we skip it.
         sorted_results_asc = sorted(results, key=lambda x: (x.start, -(x.end - x.start)))
 
         # Filter overlaps

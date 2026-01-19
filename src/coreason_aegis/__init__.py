@@ -16,6 +16,6 @@ __version__ = "0.1.0"
 __author__ = "Gowtham A Rao"
 __email__ = "gowtham.rao@coreason.ai"
 
-from .main import Aegis
+from .main import Aegis, AegisAsync
 
-__all__ = ["Aegis"]
+__all__ = ["Aegis", "AegisAsync"]

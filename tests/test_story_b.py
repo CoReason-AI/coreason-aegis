@@ -23,8 +23,8 @@ def real_aegis() -> Generator[Aegis, None, None]:
     Fixture that provides an Aegis instance with the REAL Scanner (no mocks).
     """
     # Initializing Aegis triggers Scanner initialization (which loads the heavy model)
-    aegis_instance = Aegis()
-    yield aegis_instance
+    with Aegis() as aegis_instance:
+        yield aegis_instance
 
 
 @pytest.fixture

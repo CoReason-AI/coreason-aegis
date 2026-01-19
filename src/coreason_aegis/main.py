@@ -8,6 +8,14 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_aegis
 
+"""
+Main entry point for the CoReason Aegis privacy filter.
+
+This module exposes the `Aegis` class, which orchestrates the scanning, masking,
+and re-identification of sensitive data (PII/PHI) in text streams.
+It acts as the "Air Gap" between the CoReason platform and external systems like LLMs.
+"""
+
 from typing import Optional, Tuple
 
 from coreason_aegis.masking import MaskingEngine
@@ -25,6 +33,10 @@ class Aegis:
     """
 
     def __init__(self) -> None:
+        """
+        Initializes the Aegis engine.
+        Sets up the VaultManager, Scanner, MaskingEngine, and ReIdentifier.
+        """
         self.vault = VaultManager()
         self.scanner = Scanner()
         self.masking_engine = MaskingEngine(self.vault)
@@ -39,7 +51,23 @@ class Aegis:
     ) -> Tuple[str, DeIdentificationMap]:
         """
         Scans and masks the input text.
-        Returns the sanitized text and the updated DeIdentificationMap.
+
+        This is the inbound filter. It detects sensitive entities in the `text`
+        and replaces them with tokens (masking) according to the `policy`.
+        It ensures that no sensitive data leaves the secure perimeter.
+
+        Args:
+            text: The raw input text containing potential PII/PHI.
+            session_id: The unique identifier for the user session.
+            policy: The redaction policy to apply. If None, uses default policy.
+
+        Returns:
+            A tuple containing:
+                - The sanitized text with tokens.
+                - The updated DeIdentificationMap containing the mappings.
+
+        Raises:
+            RuntimeError: If the sanitization process fails (Fail Closed).
         """
         active_policy = policy or self._default_policy
 
@@ -73,6 +101,22 @@ class Aegis:
     ) -> str:
         """
         Re-identifies the input text (response from LLM).
+
+        This is the outbound filter. It intercepts the response from the LLM,
+        looks up tokens in the `VaultManager`, and replaces them with the
+        original values if the user is authorized.
+
+        Args:
+            text: The sanitized text (from LLM) containing tokens.
+            session_id: The unique identifier for the user session.
+            authorized: Whether the user is authorized to view the PII.
+
+        Returns:
+            The re-identified text with real values (if authorized),
+            or the original tokenized text (if unauthorized or not found).
+
+        Raises:
+            Exception: If the desanitization process encounters a critical error.
         """
         try:
             result = self.reidentifier.reidentify(text, session_id, authorized)

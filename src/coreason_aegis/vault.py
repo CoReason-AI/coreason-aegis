@@ -8,6 +8,14 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_aegis
 
+"""
+VaultManager module for secure storage of de-identification maps.
+
+This module manages the ephemeral storage of mappings between sensitive data and tokens.
+It uses a Time-To-Live (TTL) cache to ensure data is automatically evicted after
+a configured duration, enforcing the "Right to be Forgotten" and session expiry.
+"""
+
 import time
 from typing import Callable, MutableMapping, Optional
 
@@ -29,8 +37,10 @@ class VaultManager:
         timer: Callable[[], float] = time.monotonic,
     ) -> None:
         """
+        Initializes the VaultManager.
+
         Args:
-            ttl_seconds: Time to live in seconds. Default 1 hour.
+            ttl_seconds: Time to live in seconds for each mapping. Default 1 hour.
             max_size: Maximum number of items in the cache. Default 10000.
             timer: Timer function for TTL. Defaults to time.monotonic.
         """
@@ -40,18 +50,33 @@ class VaultManager:
         )
 
     def save_map(self, mapping: DeIdentificationMap) -> None:
-        """Saves or updates a mapping in the vault."""
+        """
+        Saves or updates a mapping in the vault.
+
+        Args:
+            mapping: The DeIdentificationMap object to store.
+        """
         self._storage[mapping.session_id] = mapping
 
     def get_map(self, session_id: str) -> Optional[DeIdentificationMap]:
         """
         Retrieves a mapping by session_id.
-        Returns None if not found or expired (handled by TTLCache).
+
+        Args:
+            session_id: The session identifier.
+
+        Returns:
+            The DeIdentificationMap if found and not expired, else None.
         """
         # TTLCache automatically handles expiration on access (or rather, hides expired items)
         return self._storage.get(session_id)
 
     def delete_map(self, session_id: str) -> None:
-        """Deletes a mapping from the vault."""
+        """
+        Deletes a mapping from the vault.
+
+        Args:
+            session_id: The session identifier to delete.
+        """
         if session_id in self._storage:
             del self._storage[session_id]

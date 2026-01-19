@@ -8,6 +8,13 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_aegis
 
+"""
+Re-identification module for reversing tokenization.
+
+This module handles the sensitive process of replacing tokens with their original
+values in the LLM response, contingent on user authorization.
+"""
+
 from coreason_aegis.vault import VaultManager
 
 
@@ -17,6 +24,12 @@ class ReIdentifier:
     """
 
     def __init__(self, vault: VaultManager) -> None:
+        """
+        Initializes the ReIdentifier.
+
+        Args:
+            vault: The VaultManager instance to retrieve mappings from.
+        """
         self.vault = vault
 
     def reidentify(
@@ -27,6 +40,15 @@ class ReIdentifier:
     ) -> str:
         """
         Replaces tokens with real values if authorized.
+
+        Args:
+            text: The text containing tokens.
+            session_id: The session identifier to look up mappings.
+            authorized: Boolean flag indicating if the user has permission to view PII.
+
+        Returns:
+            The text with real values restored (if authorized and found),
+            otherwise the original text.
         """
         if not text:
             return ""

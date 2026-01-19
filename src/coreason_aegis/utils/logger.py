@@ -8,6 +8,13 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_aegis
 
+"""
+Logger configuration module.
+
+This module configures the `loguru` logger for the application, setting up
+sinks for stdout (human-readable) and file (JSON, rotated).
+"""
+
 import sys
 from pathlib import Path
 

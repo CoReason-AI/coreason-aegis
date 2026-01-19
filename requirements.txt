@@ -1,0 +1,5 @@
+cachetools>=5.3.3
+faker>=24.0.0
+loguru>=0.7.2
+presidio-analyzer>=2.2.355
+pydantic>=2.7.0

@@ -8,15 +8,28 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_aegis
 
+"""Re-identification engine for detokenization.
+
+This module provides the logic to reverse the tokenization process, restoring original
+values for authorized users based on the stored session mappings.
+"""
+
 from coreason_aegis.vault import VaultManager
 
 
 class ReIdentifier:
-    """
-    Handles the reversal of tokenization (re-identification) based on permissions.
+    """Handles the reversal of tokenization (re-identification) based on permissions.
+
+    This class serves as the "Reveal" component, ensuring that sensitive data is only
+    exposed when explicitly authorized.
     """
 
     def __init__(self, vault: VaultManager) -> None:
+        """Initializes the ReIdentifier.
+
+        Args:
+            vault: The VaultManager instance used to retrieve mappings.
+        """
         self.vault = vault
 
     def reidentify(
@@ -25,8 +38,16 @@ class ReIdentifier:
         session_id: str,
         authorized: bool = False,
     ) -> str:
-        """
-        Replaces tokens with real values if authorized.
+        """Replaces tokens with real values if authorized.
+
+        Args:
+            text: The text containing tokens (e.g., "[PATIENT_A]").
+            session_id: The unique session identifier.
+            authorized: Whether the requestor is authorized to view real PII.
+
+        Returns:
+            The re-identified text (if authorized and map exists), or the original
+            text with tokens preserved.
         """
         if not text:
             return ""

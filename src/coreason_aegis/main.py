@@ -8,6 +8,12 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_aegis
 
+"""Main entry point for the Aegis privacy filter.
+
+This module provides the primary `Aegis` class, which orchestrates the scanning,
+masking, and re-identification processes to enforce data privacy policies.
+"""
+
 from typing import Optional, Tuple
 
 from coreason_aegis.masking import MaskingEngine
@@ -19,12 +25,14 @@ from coreason_aegis.vault import VaultManager
 
 
 class Aegis:
-    """
-    The main interface for the privacy filter.
-    Coordinates Scanner, MaskingEngine, and ReIdentifier.
+    """The main interface for the privacy filter.
+
+    Coordinates the Scanner, MaskingEngine, and ReIdentifier components to provide
+    a unified API for sanitizing and de-sanitizing text.
     """
 
     def __init__(self) -> None:
+        """Initializes the Aegis system and its components."""
         self.vault = VaultManager()
         self.scanner = Scanner()
         self.masking_engine = MaskingEngine(self.vault)
@@ -37,9 +45,20 @@ class Aegis:
         session_id: str,
         policy: Optional[AegisPolicy] = None,
     ) -> Tuple[str, DeIdentificationMap]:
-        """
-        Scans and masks the input text.
-        Returns the sanitized text and the updated DeIdentificationMap.
+        """Scans and masks the input text based on the provided policy.
+
+        Args:
+            text: The text to sanitize.
+            session_id: The unique session identifier.
+            policy: Optional AegisPolicy override. Uses default if None.
+
+        Returns:
+            A tuple containing:
+            - The sanitized text string.
+            - The updated DeIdentificationMap.
+
+        Raises:
+            Exception: If sanitization fails (Fail Closed).
         """
         active_policy = policy or self._default_policy
 
@@ -71,8 +90,18 @@ class Aegis:
         session_id: str,
         authorized: bool = False,
     ) -> str:
-        """
-        Re-identifies the input text (response from LLM).
+        """Re-identifies the input text (e.g., response from LLM).
+
+        Args:
+            text: The text to de-sanitize.
+            session_id: The unique session identifier.
+            authorized: Whether the requestor is authorized to view real PII.
+
+        Returns:
+            The de-sanitized text (if authorized), or the original text with tokens.
+
+        Raises:
+            Exception: If de-sanitization fails.
         """
         try:
             result = self.reidentifier.reidentify(text, session_id, authorized)

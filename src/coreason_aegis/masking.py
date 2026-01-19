@@ -8,6 +8,14 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_aegis
 
+"""
+Masking module for tokenizing detected entities.
+
+This module handles the replacement of sensitive entities with tokens,
+supporting various redaction modes (MASK, REPLACE, SYNTHETIC, HASH).
+It manages the deterministic mapping between real values and tokens within a session.
+"""
+
 import hashlib
 from typing import Any, Dict, List, Tuple, cast
 
@@ -24,6 +32,12 @@ class MaskingEngine:
     """
 
     def __init__(self, vault: VaultManager) -> None:
+        """
+        Initializes the MaskingEngine.
+
+        Args:
+            vault: The VaultManager instance for storing/retrieving mappings.
+        """
         self.vault = vault
         # Initialize Faker once. We will seed it per usage.
         self.faker = Faker()
@@ -37,7 +51,18 @@ class MaskingEngine:
     ) -> Tuple[str, DeIdentificationMap]:
         """
         Masks the text based on the scanner results and policy.
-        Returns the masked text and the updated DeIdentificationMap.
+
+        Args:
+            text: The original text.
+            results: List of detected entities from the Scanner.
+            policy: The active AegisPolicy.
+            session_id: The session identifier.
+
+        Returns:
+            A tuple of (masked_text, DeIdentificationMap).
+
+        Raises:
+            ValueError: If internal logic regarding entity positions fails.
         """
         # Retrieve existing map or create new one
         deid_map = self.vault.get_map(session_id)
@@ -53,7 +78,6 @@ class MaskingEngine:
         # (Person appearing first gets A, second gets B...)
         # Also handle overlap: If two entities overlap, we must pick one.
         # We sort by start ASC, then by length DESC to prefer longer matches if they start at same position.
-        # However, if one starts later but overlaps, we skip it.
         sorted_results_asc = sorted(results, key=lambda x: (x.start, -(x.end - x.start)))
 
         # Filter overlaps
@@ -65,9 +89,6 @@ class MaskingEngine:
                 last_end = res.end
             else:
                 # This result overlaps with the previous one. Skip it.
-                # Example: "on 01/01/2025" (start 43, end 57) vs "01/01/2025" (start 47, end 57)
-                # If "on..." comes first (start 43), we keep it. "01..." (start 47) is < 57, so skip.
-                # This prevents replacing text that has already been accounted for.
                 pass
 
         # Reverse lookup: Real Value -> Token
@@ -132,6 +153,13 @@ class MaskingEngine:
     def _get_synthetic_replacement(self, text: str, entity_type: str) -> str:
         """
         Generates a deterministic synthetic value using Faker.
+
+        Args:
+            text: The original text value (used as seed).
+            entity_type: The type of entity to generate.
+
+        Returns:
+            A fake but realistic value (e.g., "John Doe" for a name).
         """
         # Hash the input text to seed Faker
         # Use hashlib.sha256 for consistency
@@ -218,6 +246,12 @@ class MaskingEngine:
         IP_ADDRESS -> IP
         SECRET_KEY -> KEY
         PERSON -> PATIENT
+
+        Args:
+            entity_type: The raw entity type from Presidio.
+
+        Returns:
+            The normalized token prefix string.
         """
         if entity_type == "PERSON":
             return "PATIENT"
@@ -243,6 +277,15 @@ class MaskingEngine:
         0 -> A
         25 -> Z
         26 -> AA
+
+        Args:
+            count: The 0-based index for the entity occurrence.
+
+        Returns:
+            The alphabetic suffix.
+
+        Raises:
+            ValueError: If count is negative.
         """
         if count < 0:
             raise ValueError("Count must be non-negative")

@@ -8,15 +8,15 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_aegis
 
-"""
-Masking module for tokenizing detected entities.
+"""Tokenization and masking engine for redaction.
 
-This module handles the replacement of sensitive entities with tokens,
-supporting various redaction modes (MASK, REPLACE, SYNTHETIC, HASH).
-It manages the deterministic mapping between real values and tokens within a session.
+This module is responsible for replacing detected entities with tokens, hashes,
+or synthetic data, and maintaining the consistency of these replacements within
+a session via the VaultManager.
 """
 
 import hashlib
+import string
 from typing import Any, Dict, List, Tuple, cast
 
 from faker import Faker
@@ -27,13 +27,15 @@ from coreason_aegis.vault import VaultManager
 
 
 class MaskingEngine:
-    """
-    Replaces detected entities with tokens and manages the de-identification map.
+    """Masks entities in text and manages de-identification mapping.
+
+    This class handles the core business logic of applying the redaction policy,
+    generating consistent tokens, and interacting with the VaultManager to store
+    reversible mappings.
     """
 
     def __init__(self, vault: VaultManager) -> None:
-        """
-        Initializes the MaskingEngine.
+        """Initializes the MaskingEngine.
 
         Args:
             vault: The VaultManager instance for storing/retrieving mappings.
@@ -49,20 +51,18 @@ class MaskingEngine:
         policy: AegisPolicy,
         session_id: str,
     ) -> Tuple[str, DeIdentificationMap]:
-        """
-        Masks the text based on the scanner results and policy.
+        """Masks the provided text based on scanner results and policy.
 
         Args:
-            text: The original text.
-            results: List of detected entities from the Scanner.
-            policy: The active AegisPolicy.
-            session_id: The session identifier.
+            text: The original input text.
+            results: List of entity detection results from the Scanner.
+            policy: The AegisPolicy defining the redaction mode (MASK, REPLACE, etc.).
+            session_id: The unique session identifier.
 
         Returns:
-            A tuple of (masked_text, DeIdentificationMap).
-
-        Raises:
-            ValueError: If internal logic regarding entity positions fails.
+            A tuple containing:
+            - The masked text string.
+            - The updated DeIdentificationMap containing the token mappings.
         """
         # Retrieve existing map or create new one
         deid_map = self.vault.get_map(session_id)
@@ -151,15 +151,14 @@ class MaskingEngine:
         return masked_text, deid_map
 
     def _get_synthetic_replacement(self, text: str, entity_type: str) -> str:
-        """
-        Generates a deterministic synthetic value using Faker.
+        """Generates a deterministic synthetic value using Faker.
 
         Args:
-            text: The original text value (used as seed).
-            entity_type: The type of entity to generate.
+            text: The original entity text (used as seed).
+            entity_type: The type of the entity (determines Faker provider).
 
         Returns:
-            A fake but realistic value (e.g., "John Doe" for a name).
+            A string containing the synthetic replacement.
         """
         # Hash the input text to seed Faker
         # Use hashlib.sha256 for consistency
@@ -222,11 +221,8 @@ class MaskingEngine:
         elif entity_type == "SECRET_KEY":
             # sk-[A-Za-z0-9]{20,}
             # Generate 24 chars suffix
-            suffix = "".join(self.faker.random_letters(length=24))
             # random_letters might return only letters. We want alphanumeric.
             # random_elements with string.ascii_letters + digits is better.
-            import string
-
             chars = string.ascii_letters + string.digits
             suffix = "".join(self.faker.random_elements(elements=list(chars), length=24, unique=False))
             return f"sk-{suffix}"
@@ -238,20 +234,21 @@ class MaskingEngine:
 
     @staticmethod
     def _normalize_entity_type(entity_type: str) -> str:
-        """
-        Normalizes Presidio entity types to simplified tokens per PRD.
+        """Normalizes Presidio entity types to simplified tokens per PRD.
+
         DATE_TIME -> DATE
         EMAIL_ADDRESS -> EMAIL
         PHONE_NUMBER -> PHONE
         IP_ADDRESS -> IP
         SECRET_KEY -> KEY
         PERSON -> PATIENT
+        LOCATION -> LOCATION (preserved)
 
         Args:
             entity_type: The raw entity type from Presidio.
 
         Returns:
-            The normalized token prefix string.
+            The normalized token string.
         """
         if entity_type == "PERSON":
             return "PATIENT"
@@ -271,18 +268,18 @@ class MaskingEngine:
 
     @staticmethod
     def _generate_suffix(count: int) -> str:
-        """
-        Generates a suffix A, B, ... Z, AA, AB... based on count (0-based index).
-        Bijective Base-26 system.
+        """Generates a suffix A, B, ... Z, AA, AB... based on count (0-based index).
+
+        Implements a Bijective Base-26 system.
         0 -> A
         25 -> Z
         26 -> AA
 
         Args:
-            count: The 0-based index for the entity occurrence.
+            count: The index to convert.
 
         Returns:
-            The alphabetic suffix.
+            The alphabetical suffix.
 
         Raises:
             ValueError: If count is negative.

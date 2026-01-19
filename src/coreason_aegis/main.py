@@ -8,12 +8,10 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_aegis
 
-"""
-Main entry point for the CoReason Aegis privacy filter.
+"""Main entry point for the Aegis privacy filter.
 
-This module exposes the `Aegis` class, which orchestrates the scanning, masking,
-and re-identification of sensitive data (PII/PHI) in text streams.
-It acts as the "Air Gap" between the CoReason platform and external systems like LLMs.
+This module provides the primary `Aegis` class, which orchestrates the scanning,
+masking, and re-identification processes to enforce data privacy policies.
 """
 
 from typing import Optional, Tuple
@@ -27,16 +25,14 @@ from coreason_aegis.vault import VaultManager
 
 
 class Aegis:
-    """
-    The main interface for the privacy filter.
-    Coordinates Scanner, MaskingEngine, and ReIdentifier.
+    """The main interface for the privacy filter.
+
+    Coordinates the Scanner, MaskingEngine, and ReIdentifier components to provide
+    a unified API for sanitizing and de-sanitizing text.
     """
 
     def __init__(self) -> None:
-        """
-        Initializes the Aegis engine.
-        Sets up the VaultManager, Scanner, MaskingEngine, and ReIdentifier.
-        """
+        """Initializes the Aegis system and its components."""
         self.vault = VaultManager()
         self.scanner = Scanner()
         self.masking_engine = MaskingEngine(self.vault)
@@ -49,25 +45,20 @@ class Aegis:
         session_id: str,
         policy: Optional[AegisPolicy] = None,
     ) -> Tuple[str, DeIdentificationMap]:
-        """
-        Scans and masks the input text.
-
-        This is the inbound filter. It detects sensitive entities in the `text`
-        and replaces them with tokens (masking) according to the `policy`.
-        It ensures that no sensitive data leaves the secure perimeter.
+        """Scans and masks the input text based on the provided policy.
 
         Args:
-            text: The raw input text containing potential PII/PHI.
-            session_id: The unique identifier for the user session.
-            policy: The redaction policy to apply. If None, uses default policy.
+            text: The text to sanitize.
+            session_id: The unique session identifier.
+            policy: Optional AegisPolicy override. Uses default if None.
 
         Returns:
             A tuple containing:
-                - The sanitized text with tokens.
-                - The updated DeIdentificationMap containing the mappings.
+            - The sanitized text string.
+            - The updated DeIdentificationMap.
 
         Raises:
-            RuntimeError: If the sanitization process fails (Fail Closed).
+            Exception: If sanitization fails (Fail Closed).
         """
         active_policy = policy or self._default_policy
 
@@ -99,24 +90,18 @@ class Aegis:
         session_id: str,
         authorized: bool = False,
     ) -> str:
-        """
-        Re-identifies the input text (response from LLM).
-
-        This is the outbound filter. It intercepts the response from the LLM,
-        looks up tokens in the `VaultManager`, and replaces them with the
-        original values if the user is authorized.
+        """Re-identifies the input text (e.g., response from LLM).
 
         Args:
-            text: The sanitized text (from LLM) containing tokens.
-            session_id: The unique identifier for the user session.
-            authorized: Whether the user is authorized to view the PII.
+            text: The text to de-sanitize.
+            session_id: The unique session identifier.
+            authorized: Whether the requestor is authorized to view real PII.
 
         Returns:
-            The re-identified text with real values (if authorized),
-            or the original tokenized text (if unauthorized or not found).
+            The de-sanitized text (if authorized), or the original text with tokens.
 
         Raises:
-            Exception: If the desanitization process encounters a critical error.
+            Exception: If de-sanitization fails.
         """
         try:
             result = self.reidentifier.reidentify(text, session_id, authorized)

@@ -8,11 +8,10 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_aegis
 
-"""
-Data models for the CoReason Aegis privacy filter.
+"""Data models for coreason-aegis configuration and state management.
 
-This module defines the Pydantic models used for policy configuration (AegisPolicy)
-and the internal mapping storage (DeIdentificationMap).
+This module defines the core data structures used throughout the Aegis system,
+including policy configuration and de-identification mapping state.
 """
 
 from datetime import datetime, timezone
@@ -23,14 +22,13 @@ from pydantic import BaseModel, Field
 
 
 class RedactionMode(str, Enum):
-    """
-    Enumeration of supported redaction modes.
+    """Enumeration of supported redaction modes.
 
     Attributes:
-        MASK: Replace with generic token (e.g., [PERSON]).
-        REPLACE: Replace with unique token (e.g., [PATIENT_A]).
-        SYNTHETIC: Replace with fake data (e.g., "Jane Doe").
-        HASH: Replace with SHA256 hash.
+        MASK: Replace entity with generic type token (e.g., [PERSON]).
+        REPLACE: Replace entity with a consistent, tracked token (e.g., [PATIENT_A]).
+        SYNTHETIC: Replace entity with realistic fake data (e.g., "Jane Doe").
+        HASH: Replace entity with a SHA-256 hash.
     """
 
     MASK = "MASK"
@@ -40,14 +38,13 @@ class RedactionMode(str, Enum):
 
 
 class AegisPolicy(BaseModel):
-    """
-    Configuration policy for the Aegis privacy filter.
+    """Configuration policy for the Aegis scanner and masker.
 
     Attributes:
-        allow_list: List of terms to exclude from redaction.
-        entity_types: List of entity types to detect and redact.
-        mode: The redaction mode to apply (REPLACE, MASK, etc.).
-        confidence_score: Threshold for NER confidence (0.0 to 1.0).
+        allow_list: List of terms to explicitly exclude from redaction (e.g., "Tylenol").
+        entity_types: List of Presidio entity types to detect and redact.
+        mode: The redaction strategy to apply (RedactionMode).
+        confidence_score: Minimum confidence score (0.0-1.0) for entity detection.
     """
 
     allow_list: List[str] = Field(default_factory=list)
@@ -70,14 +67,13 @@ class AegisPolicy(BaseModel):
 
 
 class DeIdentificationMap(BaseModel):
-    """
-    Internal model representing the mapping between tokens and real values.
+    """State container for mapping redacted tokens back to original values.
 
     Attributes:
-        session_id: Unique identifier for the user session.
-        mappings: Dictionary mapping tokens (keys) to real values (values).
-        created_at: Timestamp of creation.
-        expires_at: Timestamp when this mapping expires.
+        session_id: Unique identifier for the current session.
+        mappings: Dictionary mapping tokens (e.g., "[PATIENT_A]") to real values.
+        created_at: Timestamp when this map was created.
+        expires_at: Timestamp when this map should be evicted.
     """
 
     session_id: str

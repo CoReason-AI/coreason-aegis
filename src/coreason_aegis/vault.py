@@ -8,12 +8,11 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_aegis
 
-"""
-VaultManager module for secure storage of de-identification maps.
+"""Secure storage for de-identification mappings.
 
-This module manages the ephemeral storage of mappings between sensitive data and tokens.
-It uses a Time-To-Live (TTL) cache to ensure data is automatically evicted after
-a configured duration, enforcing the "Right to be Forgotten" and session expiry.
+This module provides the VaultManager, which handles the ephemeral storage of
+mappings between redacted tokens and real values, ensuring data expires
+appropriately.
 """
 
 import time
@@ -25,9 +24,10 @@ from coreason_aegis.models import DeIdentificationMap
 
 
 class VaultManager:
-    """
-    Manages the storage and retrieval of DeIdentificationMaps using a TTL cache.
-    Ensures secure eviction of sensitive data after a set period.
+    """Manages the storage and retrieval of DeIdentificationMaps using a TTL cache.
+
+    Ensures secure eviction of sensitive data after a set period. This acts as
+    the "Memory" component of the Aegis system.
     """
 
     def __init__(
@@ -36,8 +36,7 @@ class VaultManager:
         max_size: int = 10000,
         timer: Callable[[], float] = time.monotonic,
     ) -> None:
-        """
-        Initializes the VaultManager.
+        """Initializes the VaultManager.
 
         Args:
             ttl_seconds: Time to live in seconds for each mapping. Default 1 hour.
@@ -50,33 +49,31 @@ class VaultManager:
         )
 
     def save_map(self, mapping: DeIdentificationMap) -> None:
-        """
-        Saves or updates a mapping in the vault.
+        """Saves or updates a mapping in the vault.
 
         Args:
-            mapping: The DeIdentificationMap object to store.
+            mapping: The DeIdentificationMap to store.
         """
         self._storage[mapping.session_id] = mapping
 
     def get_map(self, session_id: str) -> Optional[DeIdentificationMap]:
-        """
-        Retrieves a mapping by session_id.
+        """Retrieves a mapping by session_id.
 
         Args:
-            session_id: The session identifier.
+            session_id: The unique session identifier.
 
         Returns:
-            The DeIdentificationMap if found and not expired, else None.
+            The DeIdentificationMap if found and valid, else None.
+            (Expiration is handled automatically by the underlying TTLCache).
         """
         # TTLCache automatically handles expiration on access (or rather, hides expired items)
         return self._storage.get(session_id)
 
     def delete_map(self, session_id: str) -> None:
-        """
-        Deletes a mapping from the vault.
+        """Deletes a mapping from the vault.
 
         Args:
-            session_id: The session identifier to delete.
+            session_id: The session ID to remove.
         """
         if session_id in self._storage:
             del self._storage[session_id]

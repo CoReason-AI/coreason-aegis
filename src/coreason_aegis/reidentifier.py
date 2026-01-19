@@ -8,27 +8,27 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_aegis
 
-"""
-Re-identification module for reversing tokenization.
+"""Re-identification engine for detokenization.
 
-This module handles the sensitive process of replacing tokens with their original
-values in the LLM response, contingent on user authorization.
+This module provides the logic to reverse the tokenization process, restoring original
+values for authorized users based on the stored session mappings.
 """
 
 from coreason_aegis.vault import VaultManager
 
 
 class ReIdentifier:
-    """
-    Handles the reversal of tokenization (re-identification) based on permissions.
+    """Handles the reversal of tokenization (re-identification) based on permissions.
+
+    This class serves as the "Reveal" component, ensuring that sensitive data is only
+    exposed when explicitly authorized.
     """
 
     def __init__(self, vault: VaultManager) -> None:
-        """
-        Initializes the ReIdentifier.
+        """Initializes the ReIdentifier.
 
         Args:
-            vault: The VaultManager instance to retrieve mappings from.
+            vault: The VaultManager instance used to retrieve mappings.
         """
         self.vault = vault
 
@@ -38,17 +38,16 @@ class ReIdentifier:
         session_id: str,
         authorized: bool = False,
     ) -> str:
-        """
-        Replaces tokens with real values if authorized.
+        """Replaces tokens with real values if authorized.
 
         Args:
-            text: The text containing tokens.
-            session_id: The session identifier to look up mappings.
-            authorized: Boolean flag indicating if the user has permission to view PII.
+            text: The text containing tokens (e.g., "[PATIENT_A]").
+            session_id: The unique session identifier.
+            authorized: Whether the requestor is authorized to view real PII.
 
         Returns:
-            The text with real values restored (if authorized and found),
-            otherwise the original text.
+            The re-identified text (if authorized and map exists), or the original
+            text with tokens preserved.
         """
         if not text:
             return ""

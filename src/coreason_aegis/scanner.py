@@ -8,12 +8,11 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_aegis
 
-"""
-Scanner module for Named Entity Recognition (NER).
+"""Named Entity Recognition (NER) scanner implementation.
 
-This module wraps Microsoft Presidio's AnalyzerEngine to provide high-speed
-detection of sensitive entities. It supports standard entities (PERSON, EMAIL, etc.)
-and custom Pharma-specific entities (MRN, PROTOCOL_ID, etc.).
+This module provides the Scanner class which wraps Microsoft Presidio's
+AnalyzerEngine to detect sensitive entities in text. It includes custom
+recognizers for specific domains like Pharma and Security.
 """
 
 from typing import Any, List, Optional, cast
@@ -27,16 +26,15 @@ _ANALYZER_ENGINE_CACHE: Optional[AnalyzerEngine] = None
 
 
 def _load_custom_recognizers(analyzer: AnalyzerEngine) -> None:
-    """
-    Loads custom recognizers for Pharma entities and registers them.
+    """Loads and registers custom entity recognizers into the Presidio analyzer.
 
-    Registers patterns for:
-    - MRN: Medical Record Number
-    - PROTOCOL_ID: Clinical Protocol IDs
-    - LOT_NUMBER: Manufacturing Lot Numbers
-    - GENE_SEQUENCE: DNA Sequences
-    - CHEMICAL_CAS: Chemical Registry Numbers
-    - SECRET_KEY: API Keys (e.g., OpenAI)
+    Registers recognizers for:
+    - MRN: Medical Record Number (6-10 digits)
+    - PROTOCOL_ID: 3 letters, dash, 3 numbers
+    - LOT_NUMBER: 'LOT-' followed by alphanumeric
+    - GENE_SEQUENCE: DNA sequences
+    - CHEMICAL_CAS: CAS Registry Numbers
+    - SECRET_KEY: API keys (e.g., sk-...)
 
     Args:
         analyzer: The Presidio AnalyzerEngine instance to update.
@@ -76,14 +74,10 @@ def _load_custom_recognizers(analyzer: AnalyzerEngine) -> None:
 
 
 def _get_analyzer_engine() -> AnalyzerEngine:
-    """
-    Retrieves the singleton instance of the Presidio AnalyzerEngine.
-
-    Initializes the engine and loads custom recognizers if not already done.
-    Ensures that the heavy model loading happens only once.
+    """Retrieves or initializes the global Presidio AnalyzerEngine instance.
 
     Returns:
-        The initialized AnalyzerEngine instance.
+        The singleton AnalyzerEngine instance.
 
     Raises:
         RuntimeError: If initialization fails.
@@ -103,35 +97,33 @@ def _get_analyzer_engine() -> AnalyzerEngine:
 
 
 class Scanner:
-    """
-    A high-speed Named Entity Recognition (NER) engine.
-    Wraps Microsoft Presidio AnalyzerEngine.
+    """A high-speed Named Entity Recognition (NER) scanner.
+
+    This class provides an interface to the Presidio AnalyzerEngine for detecting
+    sensitive information in text based on a configurable policy.
     """
 
     def __init__(self) -> None:
-        """
-        Initializes the Scanner by loading the AnalyzerEngine.
-        """
+        """Initializes the Scanner."""
         self._analyzer = _get_analyzer_engine()
 
     @property
     def analyzer(self) -> AnalyzerEngine:
-        """Returns the underlying AnalyzerEngine instance."""
+        """Returns the underlying Presidio AnalyzerEngine."""
         return self._analyzer
 
     def scan(self, text: str, policy: AegisPolicy) -> List[RecognizerResult]:
-        """
-        Scans the text for entities defined in the policy.
+        """Scans the provided text for entities defined in the policy.
 
         Args:
-            text: The text to scan.
-            policy: The policy defining which entities to detect and the confidence threshold.
+            text: The text string to scan.
+            policy: The AegisPolicy defining entity types and confidence thresholds.
 
         Returns:
-            A list of Presidio RecognizerResult objects representing detected entities.
+            A list of RecognizerResult objects containing detected entities.
 
         Raises:
-            RuntimeError: If the scan operation fails (Fail Closed).
+            RuntimeError: If the scan operation fails (Fail Closed principle).
         """
         if not text:
             return []

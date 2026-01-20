@@ -19,6 +19,7 @@ anyio = "^4.12.1"
 httpx = "^0.28.1"
 aiofiles = "^25.1.0"
 types-aiofiles = "^25.1.0.20251011"
+jaraco-context = "^6.1.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.2.2"

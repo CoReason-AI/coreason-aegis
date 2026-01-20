@@ -8,10 +8,19 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_aegis
 
+"""
+Logger configuration module.
+
+This module configures the `loguru` logger for the application, setting up
+sinks for stdout (human-readable) and file (JSON, rotated).
+"""
+
 import sys
 from pathlib import Path
 
 from loguru import logger
+
+__all__ = ["logger"]
 
 # Remove default handler
 logger.remove()
@@ -20,12 +29,17 @@ logger.remove()
 logger.add(
     sys.stderr,
     level="INFO",
-    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
+    format=(
+        "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
+        "<level>{level: <8}</level> | "
+        "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
+        "<level>{message}</level>"
+    ),
 )
 
 # Ensure logs directory exists
 log_path = Path("logs")
-if not log_path.exists():
+if not log_path.exists():  # pragma: no cover
     log_path.mkdir(parents=True, exist_ok=True)
 
 # Sink 2: File (JSON, Rotation, Retention)

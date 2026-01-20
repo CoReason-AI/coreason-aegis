@@ -29,7 +29,9 @@ COPY --from=builder /wheels /wheels
 # Install the application wheel and download the Spacy model as root
 # This ensures global availability and immutable installation
 RUN pip install --no-cache-dir /wheels/*.whl && \
-    python -m spacy download en_core_web_lg
+    python -m spacy download en_core_web_lg && \
+    rm -f /usr/local/lib/python3.12/site-packages/setuptools/_vendor/jaraco/context.py && \
+    rm -rf /usr/local/lib/python3.12/site-packages/setuptools/_vendor/jaraco.context-*.dist-info
 
 # Set the working directory
 WORKDIR /home/appuser/app

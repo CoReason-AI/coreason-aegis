@@ -31,6 +31,7 @@ def test_reidentify_success(reidentifier: ReIdentifier, vault: VaultManager) -> 
 
     session_id = "sess1"
     deid_map = DeIdentificationMap(
+        owner_id="test_owner",
         session_id=session_id,
         mappings={"[PATIENT_A]": "John Doe"},
         expires_at=datetime.now(timezone.utc),
@@ -48,6 +49,7 @@ def test_reidentify_unauthorized(reidentifier: ReIdentifier, vault: VaultManager
 
     session_id = "sess2"
     deid_map = DeIdentificationMap(
+        owner_id="test_owner",
         session_id=session_id,
         mappings={"[PATIENT_A]": "John Doe"},
         expires_at=datetime.now(timezone.utc),
@@ -77,6 +79,7 @@ def test_reidentify_empty_mappings(reidentifier: ReIdentifier, vault: VaultManag
 
     session_id = "sess_empty"
     deid_map = DeIdentificationMap(
+        owner_id="test_owner",
         session_id=session_id,
         mappings={},
         expires_at=datetime.now(timezone.utc),
@@ -96,6 +99,7 @@ def test_reidentify_partial_overlap(reidentifier: ReIdentifier, vault: VaultMana
 
     session_id = "sess_multi"
     deid_map = DeIdentificationMap(
+        owner_id="test_owner",
         session_id=session_id,
         mappings={
             "[A]": "Alpha",
@@ -118,6 +122,7 @@ def test_reidentify_nested_substrings(reidentifier: ReIdentifier, vault: VaultMa
 
     session_id = "sess_nest"
     deid_map = DeIdentificationMap(
+        owner_id="test_owner",
         session_id=session_id,
         mappings={
             "[A]": "Short",

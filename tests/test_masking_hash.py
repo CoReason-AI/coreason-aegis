@@ -28,8 +28,8 @@ def test_hash_consistency(masking_engine: MaskingEngine) -> None:
     results = [RecognizerResult("DATA", 0, 10, 1.0)]
     policy = AegisPolicy(mode=RedactionMode.HASH)
 
-    masked1, _ = masking_engine.mask(text, results, policy, "sess1")
-    masked2, _ = masking_engine.mask(text, results, policy, "sess2")
+    masked1, _ = masking_engine.mask(text, results, policy, "sess1", "test_owner")
+    masked2, _ = masking_engine.mask(text, results, policy, "sess2", "test_owner")
 
     assert masked1 == masked2
     assert masked1 == hashlib.sha256("SecretData".encode()).hexdigest()
@@ -47,7 +47,7 @@ def test_hash_no_vault_storage(masking_engine: MaskingEngine) -> None:
     results = [RecognizerResult("PERSON", 0, 4, 1.0)]
     policy = AegisPolicy(mode=RedactionMode.HASH)
 
-    _, deid_map = masking_engine.mask(text, results, policy, "sess_hash")
+    _, deid_map = masking_engine.mask(text, results, policy, "sess_hash", "test_owner")
     assert len(deid_map.mappings) == 0
 
 
@@ -57,8 +57,8 @@ def test_synthetic_consistency(masking_engine: MaskingEngine) -> None:
     results = [RecognizerResult("PERSON", 0, 8, 1.0)]
     policy = AegisPolicy(mode=RedactionMode.SYNTHETIC)
 
-    masked1, _ = masking_engine.mask(text, results, policy, "sess1")
-    masked2, _ = masking_engine.mask(text, results, policy, "sess2")
+    masked1, _ = masking_engine.mask(text, results, policy, "sess1", "test_owner")
+    masked2, _ = masking_engine.mask(text, results, policy, "sess2", "test_owner")
 
     assert masked1 == masked2
     assert masked1 != "John Doe"
@@ -73,8 +73,8 @@ def test_synthetic_different_inputs(masking_engine: MaskingEngine) -> None:
 
     policy = AegisPolicy(mode=RedactionMode.SYNTHETIC)
 
-    masked1, _ = masking_engine.mask(text1, results1, policy, "sess")
-    masked2, _ = masking_engine.mask(text2, results2, policy, "sess")
+    masked1, _ = masking_engine.mask(text1, results1, policy, "sess", "test_owner")
+    masked2, _ = masking_engine.mask(text2, results2, policy, "sess", "test_owner")
 
     # High probability they are different
     assert masked1 != masked2

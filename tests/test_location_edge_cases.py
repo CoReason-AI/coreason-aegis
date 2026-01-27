@@ -8,7 +8,10 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_aegis
 
+from unittest.mock import MagicMock
+
 import pytest
+from coreason_identity.models import UserContext
 
 from coreason_aegis.main import Aegis
 from coreason_aegis.models import AegisPolicy
@@ -18,6 +21,14 @@ from coreason_aegis.scanner import Scanner
 @pytest.fixture
 def scanner() -> Scanner:
     return Scanner()
+
+
+@pytest.fixture
+def user_context():
+    uc = MagicMock(spec=UserContext)
+    uc.sub = "test_user"
+    uc.permissions = []
+    return uc
 
 
 @pytest.mark.integration
@@ -86,7 +97,7 @@ def test_location_with_punctuation(scanner: Scanner) -> None:
 
 
 @pytest.mark.integration
-def test_repeated_locations_consistency() -> None:
+def test_repeated_locations_consistency(user_context) -> None:
     """
     Test that repeated locations map to the same token in REPLACE mode.
     """
@@ -97,7 +108,7 @@ def test_repeated_locations_consistency() -> None:
     text = "I flew from London to Paris, then back to London."
     session_id = "test_loc_consistency"
 
-    sanitized, deid_map = aegis.sanitize(text, session_id)
+    sanitized, deid_map = aegis.sanitize(text, user_context, session_id=session_id)
 
     # Expect: "I flew from [LOCATION_A] to [LOCATION_B], then back to [LOCATION_A]."
 
@@ -114,7 +125,7 @@ def test_repeated_locations_consistency() -> None:
 
 
 @pytest.mark.integration
-def test_complex_mixed_entity_paragraph() -> None:
+def test_complex_mixed_entity_paragraph(user_context) -> None:
     """
     Test a complex paragraph with multiple entity types including locations.
     """
@@ -128,7 +139,7 @@ def test_complex_mixed_entity_paragraph() -> None:
     )
     session_id = "test_complex_loc"
 
-    sanitized, deid_map = aegis.sanitize(text, session_id)
+    sanitized, deid_map = aegis.sanitize(text, user_context, session_id=session_id)
 
     # Check that original PII is gone
     assert "Alice Smith" not in sanitized

@@ -36,6 +36,7 @@ def test_save_and_get_map(vault_manager: VaultManager) -> None:
 
     session_id = "test_session"
     mapping = DeIdentificationMap(
+        owner_id="test_owner",
         session_id=session_id,
         mappings={"TOKEN": "VALUE"},
         expires_at=datetime.now(timezone.utc),
@@ -55,6 +56,7 @@ def test_ttl_expiry(vault_manager: VaultManager) -> None:
 
     session_id = "test_session_ttl"
     mapping = DeIdentificationMap(
+        owner_id="test_owner",
         session_id=session_id,
         mappings={"TOKEN": "VALUE"},
         expires_at=datetime.now(timezone.utc),
@@ -74,6 +76,7 @@ def test_delete_map(vault_manager: VaultManager) -> None:
 
     session_id = "test_session_del"
     mapping = DeIdentificationMap(
+        owner_id="test_owner",
         session_id=session_id,
         mappings={"TOKEN": "VALUE"},
         expires_at=datetime.now(timezone.utc),
@@ -97,6 +100,7 @@ def test_max_size_eviction() -> None:
 
     def create_map(sid: str) -> DeIdentificationMap:
         return DeIdentificationMap(
+            owner_id="test_owner",
             session_id=sid,
             mappings={},
             expires_at=datetime.now(timezone.utc),

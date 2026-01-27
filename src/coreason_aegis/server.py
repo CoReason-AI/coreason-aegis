@@ -15,8 +15,9 @@ endpoints for sanitization, de-sanitization, and health checks.
 """
 
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
+from typing import AsyncGenerator, List, Optional
 
+from coreason_identity.models import UserContext
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
@@ -28,8 +29,11 @@ class SanitizeRequest(BaseModel):
     """Request model for sanitizing text."""
 
     text: str
-    session_id: str
+    session_id: Optional[str] = None
     policy: AegisPolicy | None = None
+    # Simulated identity fields for now
+    user_id: str = "default_user"
+    permissions: List[str] = []
 
 
 class SanitizeResponse(BaseModel):
@@ -44,7 +48,9 @@ class DesanitizeRequest(BaseModel):
 
     text: str
     session_id: str
-    authorized: bool = False
+    # authorized is no longer used, we rely on identity
+    user_id: str = "default_user"
+    permissions: List[str] = []
 
 
 class DesanitizeResponse(BaseModel):
@@ -93,7 +99,17 @@ async def sanitize(request: SanitizeRequest) -> SanitizeResponse:
         HTTPException: 500 if sanitization fails (Fail Closed).
     """
     try:
-        text, deid_map = await app.state.aegis.sanitize(request.text, request.session_id, request.policy)
+        # Construct UserContext
+        # Note: In a real deployment, this would come from a dependency extracting from JWT/headers.
+        # WARNING: This insecure population from request body is for demonstration/harness purposes only.
+        user_context = UserContext(
+            sub=request.user_id,
+            permissions=request.permissions,
+            email="api@example.com",  # Dummy
+            project_context="default",  # Dummy
+        )
+
+        text, deid_map = await app.state.aegis.sanitize(request.text, user_context, request.session_id, request.policy)
         return SanitizeResponse(text=text, map=deid_map)
     except Exception as e:
         # Fail Closed: Block traffic on error
@@ -114,7 +130,11 @@ async def desanitize(request: DesanitizeRequest) -> DesanitizeResponse:
         HTTPException: 500 if de-sanitization fails.
     """
     try:
-        text = await app.state.aegis.desanitize(request.text, request.session_id, request.authorized)
+        user_context = UserContext(
+            sub=request.user_id, permissions=request.permissions, email="api@example.com", project_context="default"
+        )
+
+        text = await app.state.aegis.desanitize(request.text, request.session_id, user_context)
         return DesanitizeResponse(text=text)
     except Exception as e:
         # Fail Closed

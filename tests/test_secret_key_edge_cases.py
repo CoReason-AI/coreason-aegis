@@ -12,6 +12,7 @@ from typing import Generator
 from unittest.mock import MagicMock, patch
 
 import pytest
+from coreason_identity.models import UserContext
 from presidio_analyzer import RecognizerResult
 
 from coreason_aegis.main import Aegis
@@ -32,27 +33,19 @@ def aegis(mock_scanner_engine: MagicMock) -> Aegis:
 
 @pytest.fixture
 def real_aegis() -> Generator[Aegis, None, None]:
-    # Real Aegis with real models
-    # We need to clear the cache first to ensure a fresh load if needed,
-    # or rely on the existing cached one if tests ran before.
-    # To be safe and isolated, we can rely on the singleton pattern in scanner.py.
-    # But if mock_scanner_engine ran before, the cache might be None or Mock.
-    # We should ensure the cache is cleared or we mock it to None to force reload if we want real.
-    # Actually, `test_story_a.py` uses `real_aegis` which calls Aegis().
-    # If `mock_scanner_engine` was used in other tests, `_ANALYZER_ENGINE_CACHE` might be contaminated?
-    # No, `mock_scanner_engine` patches `_ANALYZER_ENGINE_CACHE` in the context of the fixture/test.
-    # Once the test ends, the patch is undone.
-    # However, if a *real* test ran first and populated `_ANALYZER_ENGINE_CACHE`,
-    # subsequent tests using `real_aegis` will get that cached real instance.
-
-    # We need to make sure we don't accidentally use a mock if we want real.
-    # The patch in `mock_scanner_engine` is a context manager, so it cleans up.
-
     aegis_instance = Aegis()
     yield aegis_instance
 
 
-def test_multiple_distinct_keys(aegis: Aegis, mock_scanner_engine: MagicMock) -> None:
+@pytest.fixture
+def user_context():
+    uc = MagicMock(spec=UserContext)
+    uc.sub = "test_user"
+    uc.permissions = []
+    return uc
+
+
+def test_multiple_distinct_keys(aegis: Aegis, mock_scanner_engine: MagicMock, user_context) -> None:
     """
     Test that two different keys map to [SECRET_KEY_A] and [SECRET_KEY_B].
     """
@@ -72,14 +65,14 @@ def test_multiple_distinct_keys(aegis: Aegis, mock_scanner_engine: MagicMock) ->
     mock_instance.analyze.return_value = results
 
     session_id = "edge_case_multi_keys"
-    masked_text, deid_map = aegis.sanitize(text, session_id)
+    masked_text, deid_map = aegis.sanitize(text, user_context, session_id=session_id)
 
     assert "Key1: [SECRET_KEY_A], Key2: [SECRET_KEY_B]" == masked_text
     assert deid_map.mappings["[SECRET_KEY_A]"] == key1
     assert deid_map.mappings["[SECRET_KEY_B]"] == key2
 
 
-def test_repeated_keys(aegis: Aegis, mock_scanner_engine: MagicMock) -> None:
+def test_repeated_keys(aegis: Aegis, mock_scanner_engine: MagicMock, user_context) -> None:
     """
     Test that the same key repeated maps to the same token [SECRET_KEY_A].
     """
@@ -96,14 +89,14 @@ def test_repeated_keys(aegis: Aegis, mock_scanner_engine: MagicMock) -> None:
     mock_instance.analyze.return_value = results
 
     session_id = "edge_case_repeat_keys"
-    masked_text, deid_map = aegis.sanitize(text, session_id)
+    masked_text, deid_map = aegis.sanitize(text, user_context, session_id=session_id)
 
     assert "Key1: [SECRET_KEY_A], Again: [SECRET_KEY_A]" == masked_text
     assert len(deid_map.mappings) == 1
     assert deid_map.mappings["[SECRET_KEY_A]"] == key1
 
 
-def test_mixed_entities_counters(aegis: Aegis, mock_scanner_engine: MagicMock) -> None:
+def test_mixed_entities_counters(aegis: Aegis, mock_scanner_engine: MagicMock, user_context) -> None:
     """
     Test that SECRET_KEY counters are independent from PATIENT counters.
     Expected: [PATIENT_A] and [SECRET_KEY_A].
@@ -126,7 +119,7 @@ def test_mixed_entities_counters(aegis: Aegis, mock_scanner_engine: MagicMock) -
     mock_instance.analyze.return_value = results
 
     session_id = "edge_case_mixed"
-    masked_text, deid_map = aegis.sanitize(text, session_id)
+    masked_text, deid_map = aegis.sanitize(text, user_context, session_id=session_id)
 
     # Should be [PATIENT_A] and [SECRET_KEY_A], not [SECRET_KEY_B]
     assert "[PATIENT_A]" in masked_text
@@ -136,7 +129,7 @@ def test_mixed_entities_counters(aegis: Aegis, mock_scanner_engine: MagicMock) -
 
 
 @pytest.mark.integration
-def test_real_regex_detection(real_aegis: Aegis) -> None:
+def test_real_regex_detection(real_aegis: Aegis, user_context) -> None:
     """
     Test with the REAL scanner to verify the regex for SECRET_KEY works as expected.
     "sk-" followed by 20+ chars.
@@ -147,7 +140,7 @@ def test_real_regex_detection(real_aegis: Aegis) -> None:
     text = f"Here is a valid key: {valid_key} and an invalid one: {invalid_key}."
     session_id = "edge_case_real_regex"
 
-    masked_text, deid_map = real_aegis.sanitize(text, session_id)
+    masked_text, deid_map = real_aegis.sanitize(text, user_context, session_id=session_id)
 
     # Valid key should be redacted
     assert valid_key not in masked_text
@@ -161,7 +154,7 @@ def test_real_regex_detection(real_aegis: Aegis) -> None:
 
 
 @pytest.mark.integration
-def test_complex_scenario_mixed_real(real_aegis: Aegis) -> None:
+def test_complex_scenario_mixed_real(real_aegis: Aegis, user_context) -> None:
     """
     Complex scenario with real scanner:
     - Text with Person, Date, Secret Key.
@@ -174,7 +167,7 @@ def test_complex_scenario_mixed_real(real_aegis: Aegis) -> None:
     text = f"User {person} created key {key} on {date}."
     session_id = "complex_real_scenario"
 
-    masked_text, deid_map = real_aegis.sanitize(text, session_id)
+    masked_text, deid_map = real_aegis.sanitize(text, user_context, session_id=session_id)
 
     # Check absence of PII
     assert person not in masked_text
@@ -191,5 +184,5 @@ def test_complex_scenario_mixed_real(real_aegis: Aegis) -> None:
     assert "[DATE_A]" in masked_text
 
     # Verify Desanitization
-    restored = real_aegis.desanitize(masked_text, session_id, authorized=True)
+    restored = real_aegis.desanitize(masked_text, session_id, user_context)
     assert restored == text

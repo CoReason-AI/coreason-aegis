@@ -42,7 +42,7 @@ def test_complex_replacement_sequence(masking_engine: MaskingEngine) -> None:
     ]
 
     policy = AegisPolicy(mode=RedactionMode.REPLACE)
-    masked, deid_map = masking_engine.mask(text, results, policy, "sess_complex")
+    masked, deid_map = masking_engine.mask(text, results, policy, "sess_complex", "test_owner")
 
     expected = "[PATIENT_A] met [PATIENT_B]. [PATIENT_A] liked [PATIENT_B]. Then [PATIENT_C] came. [PATIENT_A] left."
     assert masked == expected
@@ -68,7 +68,7 @@ def test_mixed_types_sequence(masking_engine: MaskingEngine) -> None:
     ]
 
     policy = AegisPolicy(mode=RedactionMode.REPLACE, entity_types=["PERSON", "MRN"])
-    masked, deid_map = masking_engine.mask(text, results, policy, "sess_mixed")
+    masked, deid_map = masking_engine.mask(text, results, policy, "sess_mixed", "test_owner")
 
     # [PATIENT_A] has MRN [MRN_A]. [PATIENT_B] also used [MRN_A].
     # Wait, MRN suffix counter is separate from PERSON?
@@ -94,7 +94,7 @@ def test_many_tokens(masking_engine: MaskingEngine) -> None:
         offset += len(name) + 1  # +1 for space
 
     policy = AegisPolicy(mode=RedactionMode.REPLACE)
-    masked, deid_map = masking_engine.mask(text, results, policy, "sess_many")
+    masked, deid_map = masking_engine.mask(text, results, policy, "sess_many", "test_owner")
 
     # Verify last one is [PATIENT_AD] (29th -> index 29 -> AD?)
     # 0->A ... 25->Z, 26->AA, 27->AB, 28->AC, 29->AD. Correct.

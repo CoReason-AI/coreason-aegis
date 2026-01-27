@@ -25,7 +25,7 @@ def test_empty_results(masking_engine: MaskingEngine) -> None:
     text = "Nothing here."
     results: list[RecognizerResult] = []
     policy = AegisPolicy()
-    masked, _ = masking_engine.mask(text, results, policy, "sess_empty")
+    masked, _ = masking_engine.mask(text, results, policy, "sess_empty", "test_owner")
     assert masked == text
 
 
@@ -33,7 +33,7 @@ def test_empty_text(masking_engine: MaskingEngine) -> None:
     text = ""
     results: list[RecognizerResult] = []
     policy = AegisPolicy()
-    masked, _ = masking_engine.mask(text, results, policy, "sess_empty_text")
+    masked, _ = masking_engine.mask(text, results, policy, "sess_empty_text", "test_owner")
     assert masked == ""
 
 
@@ -60,7 +60,7 @@ def test_policy_allow_list_case_sensitivity(masking_engine: MaskingEngine) -> No
     ]
     policy = AegisPolicy(mode=RedactionMode.MASK, allow_list=["John"])
 
-    masked, _ = masking_engine.mask(text, results, policy, "sess_case")
+    masked, _ = masking_engine.mask(text, results, policy, "sess_case", "test_owner")
 
     # "John" allowed -> kept.
     # "john" not in allow list -> masked.

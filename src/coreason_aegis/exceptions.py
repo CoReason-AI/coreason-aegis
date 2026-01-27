@@ -8,14 +8,10 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_aegis
 
-"""
-bidirectional privacy filter that sits between the CoReason platform and the external world
-"""
+"""Exceptions for coreason-aegis."""
 
-__version__ = "0.4.0"
-__author__ = "Gowtham A Rao"
-__email__ = "gowtham.rao@coreason.ai"
 
-from .main import Aegis, AegisAsync
+class SecurityException(Exception):
+    """Exception raised for security violations."""
 
-__all__ = ["Aegis", "AegisAsync"]
+    pass

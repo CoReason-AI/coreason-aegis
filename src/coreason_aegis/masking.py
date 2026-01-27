@@ -50,6 +50,7 @@ class MaskingEngine:
         results: List[RecognizerResult],
         policy: AegisPolicy,
         session_id: str,
+        owner_id: str,
     ) -> Tuple[str, DeIdentificationMap]:
         """Masks the provided text based on scanner results and policy.
 
@@ -58,6 +59,7 @@ class MaskingEngine:
             results: List of entity detection results from the Scanner.
             policy: The AegisPolicy defining the redaction mode (MASK, REPLACE, etc.).
             session_id: The unique session identifier.
+            owner_id: The user who owns this PII mapping.
 
         Returns:
             A tuple containing:
@@ -71,6 +73,7 @@ class MaskingEngine:
 
             deid_map = DeIdentificationMap(
                 session_id=session_id,
+                owner_id=owner_id,
                 expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
             )
 

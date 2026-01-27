@@ -18,6 +18,8 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Dict, List
 
+# Imported as requested, though potentially unused in this file directly
+from coreason_identity.models import UserContext  # noqa: F401
 from pydantic import BaseModel, Field
 
 
@@ -71,12 +73,16 @@ class DeIdentificationMap(BaseModel):
 
     Attributes:
         session_id: Unique identifier for the current session.
+        owner_id: The user who owns this PII mapping.
+        allowed_groups: List of groups allowed to access this mapping.
         mappings: Dictionary mapping tokens (e.g., "[PATIENT_A]") to real values.
         created_at: Timestamp when this map was created.
         expires_at: Timestamp when this map should be evicted.
     """
 
     session_id: str
+    owner_id: str
+    allowed_groups: List[str] = Field(default_factory=list)
     mappings: Dict[str, str] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     expires_at: datetime

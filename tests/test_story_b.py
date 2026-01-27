@@ -10,8 +10,10 @@
 
 import json
 from typing import Any, Generator, List
+from unittest.mock import MagicMock
 
 import pytest
+from coreason_identity.models import UserContext
 from loguru import logger as loguru_logger
 
 from coreason_aegis.main import Aegis
@@ -22,7 +24,6 @@ def real_aegis() -> Generator[Aegis, None, None]:
     """
     Fixture that provides an Aegis instance with the REAL Scanner (no mocks).
     """
-    # Initializing Aegis triggers Scanner initialization (which loads the heavy model)
     with Aegis() as aegis_instance:
         yield aegis_instance
 
@@ -43,35 +44,36 @@ def capture_logs() -> Generator[List[str], None, None]:
     loguru_logger.remove(handler_id)
 
 
+@pytest.fixture
+def user_context():
+    uc = MagicMock(spec=UserContext)
+    uc.sub = "user-story-b"
+    uc.permissions = []
+    return uc
+
+
 @pytest.mark.integration
-def test_credential_exposure_attempt(real_aegis: Aegis, capture_logs: List[str]) -> None:
+def test_credential_exposure_attempt(real_aegis: Aegis, capture_logs: List[str], user_context) -> None:
     """
     User Story B: The 'Leak Prevention' (Credential Exposure)
-
-    Verifies that API keys are redacted and attempts are logged securely.
     """
-    # 1. Input Data
-    # An API key pattern: sk- followed by >20 chars.
     api_key = "sk-12345abcdefghijklmnopqrstuvwxyz"
     user_prompt = f"Here is the API Key: {api_key} for the app."
     session_id = "session_story_b_real"
 
     # 2. Sanitize
-    sanitized_prompt, deid_map = real_aegis.sanitize(user_prompt, session_id)
+    sanitized_prompt, deid_map = real_aegis.sanitize(user_prompt, user_context, session_id=session_id)
 
-    # Assert 1 (Redaction): The output must contain [SECRET_KEY] token and not the key.
-    # Based on masking.py, SECRET_KEY maps to SECRET_KEY token prefix.
-    # Default mode is REPLACE, so it should be [SECRET_KEY_A].
+    # Assert 1 (Redaction)
     assert api_key not in sanitized_prompt
     assert "[SECRET_KEY_A]" in sanitized_prompt
     assert sanitized_prompt == "Here is the API Key: [SECRET_KEY_A] for the app."
 
-    # Assert 2 (Logging): Verify a WARNING was logged containing "Credential Exposure Attempt".
+    # Assert 2 (Logging)
     found_warning = False
     for message in capture_logs:
         if "Credential Exposure Attempt" in message:
             found_warning = True
-            # Assert 3 (Safety): Verify the log message does not contain the actual key.
             assert api_key not in message
             break
 
@@ -79,7 +81,7 @@ def test_credential_exposure_attempt(real_aegis: Aegis, capture_logs: List[str])
 
 
 @pytest.mark.integration
-def test_multiple_credentials(real_aegis: Aegis, capture_logs: List[str]) -> None:
+def test_multiple_credentials(real_aegis: Aegis, capture_logs: List[str], user_context) -> None:
     """
     Verifies detection of multiple distinct API keys in a single input.
     """
@@ -88,7 +90,7 @@ def test_multiple_credentials(real_aegis: Aegis, capture_logs: List[str]) -> Non
     user_prompt = f"Keys: {key_1} and {key_2}"
     session_id = "session_story_b_multi"
 
-    sanitized, deid_map = real_aegis.sanitize(user_prompt, session_id)
+    sanitized, deid_map = real_aegis.sanitize(user_prompt, user_context, session_id=session_id)
 
     assert key_1 not in sanitized
     assert key_2 not in sanitized
@@ -101,7 +103,7 @@ def test_multiple_credentials(real_aegis: Aegis, capture_logs: List[str]) -> Non
 
 
 @pytest.mark.integration
-def test_credential_in_json(real_aegis: Aegis, capture_logs: List[str]) -> None:
+def test_credential_in_json(real_aegis: Aegis, capture_logs: List[str], user_context) -> None:
     """
     Verifies detection of API keys embedded within a JSON string.
     """
@@ -110,7 +112,7 @@ def test_credential_in_json(real_aegis: Aegis, capture_logs: List[str]) -> None:
     user_prompt = json.dumps(payload)
     session_id = "session_story_b_json"
 
-    sanitized, _ = real_aegis.sanitize(user_prompt, session_id)
+    sanitized, _ = real_aegis.sanitize(user_prompt, user_context, session_id=session_id)
 
     assert api_key not in sanitized
     assert "[SECRET_KEY_A]" in sanitized
@@ -120,7 +122,7 @@ def test_credential_in_json(real_aegis: Aegis, capture_logs: List[str]) -> None:
 
 
 @pytest.mark.integration
-def test_false_positive_credential(real_aegis: Aegis) -> None:
+def test_false_positive_credential(real_aegis: Aegis, user_context) -> None:
     """
     Verifies that short strings starting with 'sk-' are NOT detected as keys.
     """
@@ -128,7 +130,7 @@ def test_false_positive_credential(real_aegis: Aegis) -> None:
     safe_text = "The skier (sk-ier) went down the slope."
     session_id = "session_story_b_fp"
 
-    sanitized, _ = real_aegis.sanitize(safe_text, session_id)
+    sanitized, _ = real_aegis.sanitize(safe_text, user_context, session_id=session_id)
 
     # Should remain unchanged
     assert sanitized == safe_text
@@ -136,7 +138,7 @@ def test_false_positive_credential(real_aegis: Aegis) -> None:
 
 
 @pytest.mark.integration
-def test_mixed_pii_and_credential(real_aegis: Aegis, capture_logs: List[str]) -> None:
+def test_mixed_pii_and_credential(real_aegis: Aegis, capture_logs: List[str], user_context) -> None:
     """
     Verifies correct handling of standard PII alongside credentials.
     """
@@ -144,7 +146,7 @@ def test_mixed_pii_and_credential(real_aegis: Aegis, capture_logs: List[str]) ->
     user_prompt = f"John Doe posted {api_key} on 01/01/2025."
     session_id = "session_story_b_mixed"
 
-    sanitized, deid_map = real_aegis.sanitize(user_prompt, session_id)
+    sanitized, deid_map = real_aegis.sanitize(user_prompt, user_context, session_id=session_id)
 
     # PII Check
     assert "John Doe" not in sanitized

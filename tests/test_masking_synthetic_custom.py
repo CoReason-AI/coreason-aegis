@@ -30,7 +30,7 @@ def test_synthetic_mrn(masking_engine: MaskingEngine) -> None:
     results = [RecognizerResult(entity_type="MRN", start=16, end=22, score=1.0)]
     policy = AegisPolicy(mode=RedactionMode.SYNTHETIC, entity_types=["MRN"])
 
-    masked_text, _ = masking_engine.mask(text, results, policy, "session_1")
+    masked_text, _ = masking_engine.mask(text, results, policy, "session_1", "test_owner")
 
     # Extract the replacement
     prefix = "Patient has MRN "
@@ -47,7 +47,7 @@ def test_synthetic_protocol_id(masking_engine: MaskingEngine) -> None:
     results = [RecognizerResult(entity_type="PROTOCOL_ID", start=9, end=16, score=1.0)]
     policy = AegisPolicy(mode=RedactionMode.SYNTHETIC, entity_types=["PROTOCOL_ID"])
 
-    masked_text, _ = masking_engine.mask(text, results, policy, "session_1")
+    masked_text, _ = masking_engine.mask(text, results, policy, "session_1", "test_owner")
 
     prefix = "Protocol "
     suffix = " started."
@@ -66,7 +66,7 @@ def test_synthetic_lot_number(masking_engine: MaskingEngine) -> None:
     results = [RecognizerResult(entity_type="LOT_NUMBER", start=6, end=14, score=1.0)]
     policy = AegisPolicy(mode=RedactionMode.SYNTHETIC, entity_types=["LOT_NUMBER"])
 
-    masked_text, _ = masking_engine.mask(text, results, policy, "session_1")
+    masked_text, _ = masking_engine.mask(text, results, policy, "session_1", "test_owner")
 
     prefix = "Batch "
     suffix = " is ready."
@@ -85,7 +85,7 @@ def test_synthetic_gene_sequence(masking_engine: MaskingEngine) -> None:
     results = [RecognizerResult(entity_type="GENE_SEQUENCE", start=9, end=19, score=1.0)]
     policy = AegisPolicy(mode=RedactionMode.SYNTHETIC, entity_types=["GENE_SEQUENCE"])
 
-    masked_text, _ = masking_engine.mask(text, results, policy, "session_1")
+    masked_text, _ = masking_engine.mask(text, results, policy, "session_1", "test_owner")
 
     prefix = "Sequence "
     suffix = " detected."
@@ -104,7 +104,7 @@ def test_synthetic_chemical_cas(masking_engine: MaskingEngine) -> None:
     results = [RecognizerResult(entity_type="CHEMICAL_CAS", start=9, end=16, score=1.0)]
     policy = AegisPolicy(mode=RedactionMode.SYNTHETIC, entity_types=["CHEMICAL_CAS"])
 
-    masked_text, _ = masking_engine.mask(text, results, policy, "session_1")
+    masked_text, _ = masking_engine.mask(text, results, policy, "session_1", "test_owner")
 
     prefix = "Chemical "
     suffix = " used."
@@ -126,7 +126,7 @@ def test_synthetic_secret_key(masking_engine: MaskingEngine) -> None:
     results = [RecognizerResult(entity_type="SECRET_KEY", start=start, end=end, score=1.0)]
     policy = AegisPolicy(mode=RedactionMode.SYNTHETIC, entity_types=["SECRET_KEY"])
 
-    masked_text, _ = masking_engine.mask(text, results, policy, "session_1")
+    masked_text, _ = masking_engine.mask(text, results, policy, "session_1", "test_owner")
 
     prefix = "Key "
     suffix = " leaked."
@@ -146,8 +146,8 @@ def test_synthetic_determinism(masking_engine: MaskingEngine) -> None:
     results = [RecognizerResult(entity_type="PROTOCOL_ID", start=9, end=16, score=1.0)]
     policy = AegisPolicy(mode=RedactionMode.SYNTHETIC, entity_types=["PROTOCOL_ID"])
 
-    repl1, _ = masking_engine.mask(text, results, policy, "s1")
-    repl2, _ = masking_engine.mask(text, results, policy, "s2")
+    repl1, _ = masking_engine.mask(text, results, policy, "s1", "test_owner")
+    repl2, _ = masking_engine.mask(text, results, policy, "s2", "test_owner")
 
     assert repl1 == repl2
 
@@ -160,7 +160,7 @@ def test_synthetic_gene_sequence_long(masking_engine: MaskingEngine) -> None:
     results = [RecognizerResult(entity_type="GENE_SEQUENCE", start=5, end=5 + len(long_seq), score=1.0)]
     policy = AegisPolicy(mode=RedactionMode.SYNTHETIC, entity_types=["GENE_SEQUENCE"])
 
-    masked_text, _ = masking_engine.mask(text, results, policy, "session_long")
+    masked_text, _ = masking_engine.mask(text, results, policy, "session_long", "test_owner")
 
     # Verify result length matches input length
     # Input total length = 5 + 1000 = 1005
@@ -209,7 +209,7 @@ def test_synthetic_mixed_scenario(masking_engine: MaskingEngine) -> None:
         entity_types=["PROTOCOL_ID", "LOT_NUMBER", "MRN", "GENE_SEQUENCE", "SECRET_KEY", "CHEMICAL_CAS"],
     )
 
-    masked_text, _ = masking_engine.mask(text, results, policy, "session_mixed")
+    masked_text, _ = masking_engine.mask(text, results, policy, "session_mixed", "test_owner")
 
     # Verify structural integrity (surrounding text should remain)
     assert "Protocol " in masked_text
@@ -241,7 +241,7 @@ def test_synthetic_unicode_input(masking_engine: MaskingEngine) -> None:
     results = [RecognizerResult(entity_type="PROTOCOL_ID", start=11, end=18, score=1.0)]
     policy = AegisPolicy(mode=RedactionMode.SYNTHETIC, entity_types=["PROTOCOL_ID"])
 
-    masked_text, _ = masking_engine.mask(text, results, policy, "session_unicode")
+    masked_text, _ = masking_engine.mask(text, results, policy, "session_unicode", "test_owner")
 
     assert masked_text.startswith("Prótocol 🚀 ")
     repl = masked_text[11:]
@@ -249,5 +249,5 @@ def test_synthetic_unicode_input(masking_engine: MaskingEngine) -> None:
     assert repl != "ABC-123"
 
     # Verify determinism for unicode too
-    masked_text_2, _ = masking_engine.mask(text, results, policy, "session_unicode_2")
+    masked_text_2, _ = masking_engine.mask(text, results, policy, "session_unicode_2", "test_owner")
     assert masked_text == masked_text_2

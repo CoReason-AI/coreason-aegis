@@ -8,28 +8,30 @@
 #
 # Source Code: https://github.com/CoReason-AI/coreason_aegis
 
+from typing import Generator
+from unittest.mock import MagicMock, patch
+
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
+
 from coreason_aegis.server import app
 
+
 @pytest.fixture
-def client():
+def client() -> Generator[TestClient, None, None]:
     """Fixture to provide a TestClient instance with lifespan management."""
     with TestClient(app) as c:
         yield c
 
-def test_health_check(client):
+
+def test_health_check(client: TestClient) -> None:
     """Test the health check endpoint."""
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {
-        "status": "protected",
-        "engine": "presidio",
-        "model": "en_core_web_lg"
-    }
+    assert response.json() == {"status": "protected", "engine": "presidio", "model": "en_core_web_lg"}
 
-def test_health_check_unhealthy(client):
+
+def test_health_check_unhealthy(client: TestClient) -> None:
     """Test health check when scanner is not initialized."""
     # Temporarily replace scanner with a mock that has no analyzer
     original_scanner = app.state.aegis.scanner
@@ -46,12 +48,10 @@ def test_health_check_unhealthy(client):
     finally:
         app.state.aegis.scanner = original_scanner
 
-def test_sanitize_endpoint(client):
+
+def test_sanitize_endpoint(client: TestClient) -> None:
     """Test the sanitize endpoint with valid data."""
-    payload = {
-        "text": "My name is John Doe and I live in New York.",
-        "session_id": "test_session_1"
-    }
+    payload = {"text": "My name is John Doe and I live in New York.", "session_id": "test_session_1"}
     response = client.post("/sanitize", json=payload)
     assert response.status_code == 200
     data = response.json()
@@ -68,53 +68,42 @@ def test_sanitize_endpoint(client):
     # Just checking if they are redacted is enough, but let's check for brackets
     assert "[" in sanitized_text and "]" in sanitized_text
 
-def test_desanitize_endpoint(client):
+
+def test_desanitize_endpoint(client: TestClient) -> None:
     """Test the desanitize endpoint (requires state from sanitize)."""
     session_id = "test_session_2"
     original_text = "Contact support at 555-0199."
 
     # 1. Sanitize
-    san_response = client.post("/sanitize", json={
-        "text": original_text,
-        "session_id": session_id
-    })
+    san_response = client.post("/sanitize", json={"text": original_text, "session_id": session_id})
     assert san_response.status_code == 200
     san_text = san_response.json()["text"]
 
     # 2. Desanitize (Authorized)
-    desan_response = client.post("/desanitize", json={
-        "text": san_text,
-        "session_id": session_id,
-        "authorized": True
-    })
+    desan_response = client.post("/desanitize", json={"text": san_text, "session_id": session_id, "authorized": True})
     assert desan_response.status_code == 200
     desan_text = desan_response.json()["text"]
 
     assert desan_text == original_text
 
-def test_desanitize_unauthorized(client):
+
+def test_desanitize_unauthorized(client: TestClient) -> None:
     """Test desanitize without authorization."""
     session_id = "test_session_3"
     original_text = "My email is test@example.com"
 
     # 1. Sanitize
-    san_response = client.post("/sanitize", json={
-        "text": original_text,
-        "session_id": session_id
-    })
+    san_response = client.post("/sanitize", json={"text": original_text, "session_id": session_id})
     san_text = san_response.json()["text"]
 
     # 2. Desanitize (Unauthorized)
-    desan_response = client.post("/desanitize", json={
-        "text": san_text,
-        "session_id": session_id,
-        "authorized": False
-    })
+    desan_response = client.post("/desanitize", json={"text": san_text, "session_id": session_id, "authorized": False})
     assert desan_response.status_code == 200
     # Should return the masked text
     assert desan_response.json()["text"] == san_text
 
-def test_sanitize_fail_closed():
+
+def test_sanitize_fail_closed() -> None:
     """Test that the system fails closed (500) if scanning/masking fails."""
     # Patching AegisAsync.sanitize to raise an exception
     with patch("coreason_aegis.main.AegisAsync.sanitize", side_effect=Exception("Simulated Failure")):
@@ -124,23 +113,17 @@ def test_sanitize_fail_closed():
         # Patching the class method works for instances.
 
         with TestClient(app) as fail_client:
-            payload = {
-                "text": "Safe text",
-                "session_id": "fail_test"
-            }
+            payload = {"text": "Safe text", "session_id": "fail_test"}
             response = fail_client.post("/sanitize", json=payload)
             assert response.status_code == 500
             assert "Sanitization failed" in response.json()["detail"]
 
-def test_desanitize_fail_closed():
+
+def test_desanitize_fail_closed() -> None:
     """Test that the system fails closed (500) if re-identification fails."""
     with patch("coreason_aegis.main.AegisAsync.desanitize", side_effect=Exception("Simulated Failure")):
         with TestClient(app) as fail_client:
-            payload = {
-                "text": "Some text",
-                "session_id": "fail_test_desan",
-                "authorized": True
-            }
+            payload = {"text": "Some text", "session_id": "fail_test_desan", "authorized": True}
             response = fail_client.post("/desanitize", json=payload)
             assert response.status_code == 500
             assert "Desanitization failed" in response.json()["detail"]

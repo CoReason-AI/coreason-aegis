@@ -15,7 +15,7 @@ endpoints for sanitization, de-sanitization, and health checks.
 """
 
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import AsyncGenerator
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -29,7 +29,7 @@ class SanitizeRequest(BaseModel):
 
     text: str
     session_id: str
-    policy: Optional[AegisPolicy] = None
+    policy: AegisPolicy | None = None
 
 
 class SanitizeResponse(BaseModel):
@@ -62,7 +62,7 @@ class HealthResponse(BaseModel):
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Manages the lifecycle of the Aegis application.
 
     Initializes the heavy AegisAsync instance (loading NLP models) on startup
@@ -80,7 +80,7 @@ app = FastAPI(lifespan=lifespan)
 
 
 @app.post("/sanitize", response_model=SanitizeResponse)
-async def sanitize(request: SanitizeRequest):
+async def sanitize(request: SanitizeRequest) -> SanitizeResponse:
     """Sanitizes the input text by redacting sensitive entities.
 
     Args:
@@ -93,17 +93,15 @@ async def sanitize(request: SanitizeRequest):
         HTTPException: 500 if sanitization fails (Fail Closed).
     """
     try:
-        text, deid_map = await app.state.aegis.sanitize(
-            request.text, request.session_id, request.policy
-        )
+        text, deid_map = await app.state.aegis.sanitize(request.text, request.session_id, request.policy)
         return SanitizeResponse(text=text, map=deid_map)
     except Exception as e:
         # Fail Closed: Block traffic on error
-        raise HTTPException(status_code=500, detail=f"Sanitization failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Sanitization failed: {e}") from e
 
 
 @app.post("/desanitize", response_model=DesanitizeResponse)
-async def desanitize(request: DesanitizeRequest):
+async def desanitize(request: DesanitizeRequest) -> DesanitizeResponse:
     """Re-identifies the input text if authorized.
 
     Args:
@@ -116,17 +114,15 @@ async def desanitize(request: DesanitizeRequest):
         HTTPException: 500 if de-sanitization fails.
     """
     try:
-        text = await app.state.aegis.desanitize(
-            request.text, request.session_id, request.authorized
-        )
+        text = await app.state.aegis.desanitize(request.text, request.session_id, request.authorized)
         return DesanitizeResponse(text=text)
     except Exception as e:
         # Fail Closed
-        raise HTTPException(status_code=500, detail=f"Desanitization failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Desanitization failed: {e}") from e
 
 
 @app.get("/health", response_model=HealthResponse)
-async def health():
+async def health() -> HealthResponse:
     """Checks the health of the Aegis service.
 
     Returns:

@@ -12,9 +12,10 @@ from typing import Generator
 from unittest.mock import MagicMock, patch
 
 import pytest
-from coreason_aegis.main import Aegis
 from coreason_identity.models import UserContext
 from presidio_analyzer import RecognizerResult
+
+from coreason_aegis.main import Aegis
 
 
 @pytest.fixture

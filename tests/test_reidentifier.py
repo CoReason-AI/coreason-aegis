@@ -9,10 +9,11 @@
 # Source Code: https://github.com/CoReason-AI/coreason_aegis
 
 import pytest
+from coreason_identity.models import UserContext
+
 from coreason_aegis.models import DeIdentificationMap
 from coreason_aegis.reidentifier import ReIdentifier
 from coreason_aegis.vault import VaultManager
-from coreason_identity.models import UserContext
 
 
 @pytest.fixture

@@ -9,9 +9,10 @@
 # Source Code: https://github.com/CoReason-AI/coreason_aegis
 
 import pytest
+from coreason_identity.models import UserContext
+
 from coreason_aegis.models import AegisPolicy
 from coreason_aegis.scanner import Scanner
-from coreason_identity.models import UserContext
 
 
 @pytest.fixture

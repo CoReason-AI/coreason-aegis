@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock
 
 import pytest
+
 from coreason_aegis.main import Aegis, AegisAsync, mask, reidentify, scan
 
 

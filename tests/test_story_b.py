@@ -12,9 +12,10 @@ import json
 from typing import Any, Generator, List
 
 import pytest
-from coreason_aegis.main import Aegis
 from coreason_identity.models import UserContext
 from loguru import logger as loguru_logger
+
+from coreason_aegis.main import Aegis
 
 
 @pytest.fixture

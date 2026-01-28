@@ -11,8 +11,9 @@
 from typing import Generator
 
 import pytest
-from coreason_aegis.main import Aegis
 from coreason_identity.models import UserContext
+
+from coreason_aegis.main import Aegis
 
 
 @pytest.fixture

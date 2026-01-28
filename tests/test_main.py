@@ -13,10 +13,11 @@ from typing import AsyncGenerator, Generator
 from unittest.mock import MagicMock, patch
 
 import pytest
-from coreason_aegis.main import Aegis, AegisAsync
 from coreason_identity.models import UserContext
 from loguru import logger
 from presidio_analyzer import RecognizerResult
+
+from coreason_aegis.main import Aegis, AegisAsync
 
 
 @pytest.fixture

@@ -12,9 +12,10 @@ import time
 
 import pytest
 from cachetools import TTLCache
+from coreason_identity.models import UserContext
+
 from coreason_aegis.models import DeIdentificationMap
 from coreason_aegis.vault import VaultManager
-from coreason_identity.models import UserContext
 
 
 @pytest.fixture

@@ -4,7 +4,7 @@ from typing import Any, Dict, Generator, List
 from unittest.mock import MagicMock, patch
 
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 # --- Mock coreason_identity ---
 
@@ -21,12 +21,11 @@ class SecretStr:
 
 
 class UserContext(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     user_id: Any  # annotated as SecretStr in usage
     roles: List[str]
     metadata: Dict[str, Any]
-
-    class Config:
-        arbitrary_types_allowed = True
 
 
 # Mock the modules before any test imports them

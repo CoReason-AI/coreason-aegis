@@ -14,6 +14,8 @@ This module provides the primary `Aegis` class, which orchestrates the scanning,
 masking, and re-identification processes to enforce data privacy policies.
 """
 
+# mypy: no-warn-unused-ignores
+
 from typing import Any, Optional, Tuple, cast
 
 import anyio

@@ -80,9 +80,7 @@ def test_mask_mode_replace_reuse(masking_engine: MaskingEngine, mock_context: Us
     session_id = "sess_reuse"
 
     # First pass
-    masking_engine.mask(
-        "John Doe", [RecognizerResult("PERSON", 0, 8, 1.0)], policy, session_id, context=mock_context
-    )
+    masking_engine.mask("John Doe", [RecognizerResult("PERSON", 0, 8, 1.0)], policy, session_id, context=mock_context)
 
     # Second pass
     masked, deid_map = masking_engine.mask(text, results, policy, session_id, context=mock_context)
@@ -170,18 +168,14 @@ def test_synthetic_fallback(masking_engine: MaskingEngine, mock_context: UserCon
 
     # Case 2: Generic fallback
     results_generic = [RecognizerResult("UNKNOWN_TYPE", 0, 15, 1.0)]
-    masked_generic, _ = masking_engine.mask(
-        text, results_generic, policy, "sess_fallback_gen", context=mock_context
-    )
+    masked_generic, _ = masking_engine.mask(text, results_generic, policy, "sess_fallback_gen", context=mock_context)
     assert isinstance(masked_generic, str)
     assert masked_generic != text
     assert masked_generic != masked_mrn
 
     # Coverage for line 96 (seeding logic):
     # This is implicitly covered by test_mask_mode_synthetic, but let's double check determinism for custom types
-    masked_generic_2, _ = masking_engine.mask(
-        text, results_generic, policy, "sess_fallback_gen", context=mock_context
-    )
+    masked_generic_2, _ = masking_engine.mask(text, results_generic, policy, "sess_fallback_gen", context=mock_context)
     assert masked_generic == masked_generic_2
 
 

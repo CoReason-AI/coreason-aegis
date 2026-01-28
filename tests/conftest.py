@@ -8,15 +8,17 @@ from pydantic import BaseModel
 
 # --- Mock coreason_identity ---
 
+
 class SecretStr:
-    def __init__(self, value: str):
+    def __init__(self, value: str) -> None:
         self._value = value
 
     def get_secret_value(self) -> str:
         return self._value
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "SecretStr('**********')"
+
 
 class UserContext(BaseModel):
     user_id: Any  # annotated as SecretStr in usage
@@ -26,14 +28,15 @@ class UserContext(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
+
 # Mock the modules before any test imports them
 
 # Create mock modules
 mock_types = types.ModuleType("coreason_identity.types")
-mock_types.SecretStr = SecretStr # type: ignore
+mock_types.SecretStr = SecretStr  # type: ignore
 
 mock_models = types.ModuleType("coreason_identity.models")
-mock_models.UserContext = UserContext # type: ignore
+mock_models.UserContext = UserContext  # type: ignore
 
 # Patch sys.modules
 # We must do this before importing coreason_aegis modules in tests
@@ -43,13 +46,11 @@ sys.modules["coreason_identity.models"] = mock_models
 # Also patch the root package if needed, but usually specific submodules are enough
 # if imports are from submodules.
 
+
 @pytest.fixture
 def mock_context() -> UserContext:
-    return UserContext(
-        user_id=SecretStr("test-user"),
-        roles=["tester"],
-        metadata={"source": "test"}
-    )
+    return UserContext(user_id=SecretStr("test-user"), roles=["tester"], metadata={"source": "test"})
+
 
 @pytest.fixture
 def mock_scanner_engine() -> Generator[MagicMock, None, None]:

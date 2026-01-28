@@ -144,11 +144,9 @@ class AegisAsync:
         try:
             # CPU bound
             # Explicitly cast to str because run_sync returns Any
-            result = await anyio.to_thread.run_sync(
-                self.reidentifier.reidentify, text, session_id, context, authorized
-            )
+            result = await anyio.to_thread.run_sync(self.reidentifier.reidentify, text, session_id, context, authorized)
             logger.info(f"Desanitized text for session {session_id}. Authorized: {authorized}")
-            return cast(str, result)
+            return result
         except Exception as e:
             logger.error(f"Desanitization failed for session {session_id}: {e}")
             # Fail Closed: Propagate exception
@@ -186,10 +184,7 @@ class Aegis:
         policy: Optional[AegisPolicy] = None,
     ) -> Tuple[str, DeIdentificationMap]:
         """Scans and masks the input text (blocking)."""
-        return cast(
-            Tuple[str, DeIdentificationMap],
-            anyio.run(self._async.sanitize, text, session_id, context, policy),
-        )
+        return anyio.run(self._async.sanitize, text, session_id, context, policy)
 
     def desanitize(
         self,
@@ -199,10 +194,7 @@ class Aegis:
         authorized: bool = False,
     ) -> str:
         """Re-identifies the input text (blocking)."""
-        return cast(
-            str,
-            anyio.run(self._async.desanitize, text, session_id, context, authorized),
-        )
+        return anyio.run(self._async.desanitize, text, session_id, context, authorized)
 
 
 def _get_system_context() -> UserContext:

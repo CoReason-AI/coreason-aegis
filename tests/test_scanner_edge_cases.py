@@ -9,6 +9,7 @@
 # Source Code: https://github.com/CoReason-AI/coreason_aegis
 
 import pytest
+from coreason_identity.models import UserContext
 
 from coreason_aegis.models import AegisPolicy
 from coreason_aegis.scanner import Scanner
@@ -20,7 +21,7 @@ def scanner() -> Scanner:
 
 
 @pytest.mark.integration
-def test_false_positive_avoidance(scanner: Scanner) -> None:
+def test_false_positive_avoidance(scanner: Scanner, mock_context: UserContext) -> None:
     """
     Verifies that common words or short sequences do not trigger custom recognizers.
     """
@@ -36,7 +37,7 @@ def test_false_positive_avoidance(scanner: Scanner) -> None:
         entity_types=["LOT_NUMBER", "SECRET_KEY", "GENE_SEQUENCE", "MRN", "PROTOCOL_ID"], confidence_score=0.4
     )
 
-    results = scanner.scan(text, policy)
+    results = scanner.scan(text, policy, context=mock_context)
     detected_texts = {text[r.start : r.end] for r in results}
 
     # Assert ABSENCE of false positives
@@ -53,7 +54,7 @@ def test_false_positive_avoidance(scanner: Scanner) -> None:
 
 
 @pytest.mark.integration
-def test_idempotency_or_remasking(scanner: Scanner) -> None:
+def test_idempotency_or_remasking(scanner: Scanner, mock_context: UserContext) -> None:
     """
     Checks behavior when input already contains text that looks like tokens.
     Ideally, we don't want to double-redact if it confuses the system,
@@ -65,7 +66,7 @@ def test_idempotency_or_remasking(scanner: Scanner) -> None:
     # Spacy usually treats brackets as punctuation.
 
     policy = AegisPolicy(entity_types=["PERSON"], confidence_score=0.4)
-    results = scanner.scan(text, policy)
+    results = scanner.scan(text, policy, context=mock_context)
     detected = {text[r.start : r.end] for r in results}
 
     # If "PATIENT_A" is detected as a person, it's a bit ambiguous.
@@ -76,7 +77,7 @@ def test_idempotency_or_remasking(scanner: Scanner) -> None:
 
 
 @pytest.mark.integration
-def test_long_continuous_string(scanner: Scanner) -> None:
+def test_long_continuous_string(scanner: Scanner, mock_context: UserContext) -> None:
     """
     Tests stability with a very long string without spaces (potential buffer/regex issues).
     """
@@ -85,7 +86,7 @@ def test_long_continuous_string(scanner: Scanner) -> None:
 
     policy = AegisPolicy(entity_types=["MRN"], confidence_score=0.4)
 
-    results = scanner.scan(text, policy)
+    results = scanner.scan(text, policy, context=mock_context)
 
     # Should detect the MRN buried in the middle?
     # MRN regex is \b\d{6,10}\b.
@@ -97,7 +98,7 @@ def test_long_continuous_string(scanner: Scanner) -> None:
 
     # Now try with separators
     text_with_sep = "A" * 50000 + " 123456 " + "B" * 50000
-    results_sep = scanner.scan(text_with_sep, policy)
+    results_sep = scanner.scan(text_with_sep, policy, context=mock_context)
 
     # Should detect
     assert len(results_sep) == 1

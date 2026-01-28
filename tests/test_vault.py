@@ -12,9 +12,9 @@ import time
 
 import pytest
 from cachetools import TTLCache
-
 from coreason_aegis.models import DeIdentificationMap
 from coreason_aegis.vault import VaultManager
+from coreason_identity.models import UserContext
 
 
 @pytest.fixture
@@ -31,7 +31,7 @@ def test_initialization_defaults() -> None:
     assert vault._storage.ttl == 3600
 
 
-def test_save_and_get_map(vault_manager: VaultManager) -> None:
+def test_save_and_get_map(vault_manager: VaultManager, mock_context: UserContext) -> None:
     from datetime import datetime, timezone
 
     session_id = "test_session"
@@ -41,16 +41,16 @@ def test_save_and_get_map(vault_manager: VaultManager) -> None:
         expires_at=datetime.now(timezone.utc),
     )
 
-    vault_manager.save_map(mapping)
-    retrieved = vault_manager.get_map(session_id)
+    vault_manager.save_map(mapping, context=mock_context)
+    retrieved = vault_manager.get_map(session_id, context=mock_context)
     assert retrieved == mapping
 
 
-def test_get_nonexistent_map(vault_manager: VaultManager) -> None:
-    assert vault_manager.get_map("nonexistent") is None
+def test_get_nonexistent_map(vault_manager: VaultManager, mock_context: UserContext) -> None:
+    assert vault_manager.get_map("nonexistent", context=mock_context) is None
 
 
-def test_ttl_expiry(vault_manager: VaultManager) -> None:
+def test_ttl_expiry(vault_manager: VaultManager, mock_context: UserContext) -> None:
     from datetime import datetime, timezone
 
     session_id = "test_session_ttl"
@@ -60,16 +60,16 @@ def test_ttl_expiry(vault_manager: VaultManager) -> None:
         expires_at=datetime.now(timezone.utc),
     )
 
-    vault_manager.save_map(mapping)
-    assert vault_manager.get_map(session_id) is not None
+    vault_manager.save_map(mapping, context=mock_context)
+    assert vault_manager.get_map(session_id, context=mock_context) is not None
 
     # Wait for TTL expiry
     time.sleep(1.1)
 
-    assert vault_manager.get_map(session_id) is None
+    assert vault_manager.get_map(session_id, context=mock_context) is None
 
 
-def test_delete_map(vault_manager: VaultManager) -> None:
+def test_delete_map(vault_manager: VaultManager, mock_context: UserContext) -> None:
     from datetime import datetime, timezone
 
     session_id = "test_session_del"
@@ -79,17 +79,17 @@ def test_delete_map(vault_manager: VaultManager) -> None:
         expires_at=datetime.now(timezone.utc),
     )
 
-    vault_manager.save_map(mapping)
-    vault_manager.delete_map(session_id)
-    assert vault_manager.get_map(session_id) is None
+    vault_manager.save_map(mapping, context=mock_context)
+    vault_manager.delete_map(session_id, context=mock_context)
+    assert vault_manager.get_map(session_id, context=mock_context) is None
 
 
-def test_delete_nonexistent_map(vault_manager: VaultManager) -> None:
+def test_delete_nonexistent_map(vault_manager: VaultManager, mock_context: UserContext) -> None:
     # Should not raise error
-    vault_manager.delete_map("nonexistent")
+    vault_manager.delete_map("nonexistent", context=mock_context)
 
 
-def test_max_size_eviction() -> None:
+def test_max_size_eviction(mock_context: UserContext) -> None:
     # Test that LRU eviction works (cachetools logic)
     # Use small cache
     vault = VaultManager(max_size=2)
@@ -102,13 +102,13 @@ def test_max_size_eviction() -> None:
             expires_at=datetime.now(timezone.utc),
         )
 
-    vault.save_map(create_map("1"))
-    vault.save_map(create_map("2"))
-    assert vault.get_map("1") is not None
-    assert vault.get_map("2") is not None
+    vault.save_map(create_map("1"), context=mock_context)
+    vault.save_map(create_map("2"), context=mock_context)
+    assert vault.get_map("1", context=mock_context) is not None
+    assert vault.get_map("2", context=mock_context) is not None
 
-    vault.save_map(create_map("3"))
+    vault.save_map(create_map("3"), context=mock_context)
     # Expect 1 to be evicted (LRU)
-    assert vault.get_map("3") is not None
-    assert vault.get_map("2") is not None
-    assert vault.get_map("1") is None
+    assert vault.get_map("3", context=mock_context) is not None
+    assert vault.get_map("2", context=mock_context) is not None
+    assert vault.get_map("1", context=mock_context) is None

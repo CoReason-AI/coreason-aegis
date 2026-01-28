@@ -9,7 +9,6 @@
 # Source Code: https://github.com/CoReason-AI/coreason_aegis
 
 import pytest
-
 from coreason_aegis.masking import MaskingEngine
 from coreason_aegis.vault import VaultManager
 

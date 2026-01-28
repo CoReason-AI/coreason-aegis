@@ -9,11 +9,11 @@
 # Source Code: https://github.com/CoReason-AI/coreason_aegis
 
 import pytest
-from presidio_analyzer import RecognizerResult
-
 from coreason_aegis.masking import MaskingEngine
 from coreason_aegis.models import AegisPolicy, RedactionMode
 from coreason_aegis.vault import VaultManager
+from coreason_identity.models import UserContext
+from presidio_analyzer import RecognizerResult
 
 
 @pytest.fixture
@@ -21,7 +21,7 @@ def masking_engine() -> MaskingEngine:
     return MaskingEngine(VaultManager())
 
 
-def test_complex_replacement_sequence(masking_engine: MaskingEngine) -> None:
+def test_complex_replacement_sequence(masking_engine: MaskingEngine, mock_context: UserContext) -> None:
     # A B A C B A
     # A -> [TOKEN_A]
     # B -> [TOKEN_B]
@@ -42,7 +42,7 @@ def test_complex_replacement_sequence(masking_engine: MaskingEngine) -> None:
     ]
 
     policy = AegisPolicy(mode=RedactionMode.REPLACE)
-    masked, deid_map = masking_engine.mask(text, results, policy, "sess_complex")
+    masked, deid_map = masking_engine.mask(text, results, policy, "sess_complex", context=mock_context)
 
     expected = "[PATIENT_A] met [PATIENT_B]. [PATIENT_A] liked [PATIENT_B]. Then [PATIENT_C] came. [PATIENT_A] left."
     assert masked == expected
@@ -51,7 +51,7 @@ def test_complex_replacement_sequence(masking_engine: MaskingEngine) -> None:
     assert deid_map.mappings["[PATIENT_C]"] == "Bob"
 
 
-def test_mixed_types_sequence(masking_engine: MaskingEngine) -> None:
+def test_mixed_types_sequence(masking_engine: MaskingEngine, mock_context: UserContext) -> None:
     # John (PERSON), 123 (MRN), Jane (PERSON)
     # A, A, B
     text = "John has MRN 123. Jane also used 123."
@@ -68,7 +68,7 @@ def test_mixed_types_sequence(masking_engine: MaskingEngine) -> None:
     ]
 
     policy = AegisPolicy(mode=RedactionMode.REPLACE, entity_types=["PERSON", "MRN"])
-    masked, deid_map = masking_engine.mask(text, results, policy, "sess_mixed")
+    masked, deid_map = masking_engine.mask(text, results, policy, "sess_mixed", context=mock_context)
 
     # [PATIENT_A] has MRN [MRN_A]. [PATIENT_B] also used [MRN_A].
     # Wait, MRN suffix counter is separate from PERSON?
@@ -82,7 +82,7 @@ def test_mixed_types_sequence(masking_engine: MaskingEngine) -> None:
     assert deid_map.mappings["[MRN_A]"] == "123"
 
 
-def test_many_tokens(masking_engine: MaskingEngine) -> None:
+def test_many_tokens(masking_engine: MaskingEngine, mock_context: UserContext) -> None:
     # Test AA, AB...
     # Generate 30 names
     names = [f"Name{i}" for i in range(30)]
@@ -94,7 +94,7 @@ def test_many_tokens(masking_engine: MaskingEngine) -> None:
         offset += len(name) + 1  # +1 for space
 
     policy = AegisPolicy(mode=RedactionMode.REPLACE)
-    masked, deid_map = masking_engine.mask(text, results, policy, "sess_many")
+    masked, deid_map = masking_engine.mask(text, results, policy, "sess_many", context=mock_context)
 
     # Verify last one is [PATIENT_AD] (29th -> index 29 -> AD?)
     # 0->A ... 25->Z, 26->AA, 27->AB, 28->AC, 29->AD. Correct.

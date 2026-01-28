@@ -9,10 +9,10 @@
 # Source Code: https://github.com/CoReason-AI/coreason_aegis
 
 import pytest
-
 from coreason_aegis.main import Aegis
 from coreason_aegis.models import AegisPolicy
 from coreason_aegis.scanner import Scanner
+from coreason_identity.models import UserContext
 
 
 @pytest.fixture
@@ -21,7 +21,7 @@ def scanner() -> Scanner:
 
 
 @pytest.mark.integration
-def test_ambiguous_location_vs_name(scanner: Scanner) -> None:
+def test_ambiguous_location_vs_name(scanner: Scanner, mock_context: UserContext) -> None:
     """
     Test differentiation between ambiguous names that are also locations.
     e.g., "Washington" (Name) vs "Washington" (Location).
@@ -29,7 +29,7 @@ def test_ambiguous_location_vs_name(scanner: Scanner) -> None:
     """
     text = "George Washington visited Washington."
     policy = AegisPolicy(entity_types=["PERSON", "LOCATION"], confidence_score=0.4)
-    results = scanner.scan(text, policy)
+    results = scanner.scan(text, policy, context=mock_context)
 
     detected_texts = [text[r.start : r.end] for r in results]
     entity_types = [r.entity_type for r in results]
@@ -56,13 +56,13 @@ def test_ambiguous_location_vs_name(scanner: Scanner) -> None:
 
 
 @pytest.mark.integration
-def test_multi_word_locations(scanner: Scanner) -> None:
+def test_multi_word_locations(scanner: Scanner, mock_context: UserContext) -> None:
     """
     Test detection of multi-word locations.
     """
     text = "I live in New York and work in San Francisco."
     policy = AegisPolicy(entity_types=["LOCATION"], confidence_score=0.4)
-    results = scanner.scan(text, policy)
+    results = scanner.scan(text, policy, context=mock_context)
 
     detected = {text[r.start : r.end] for r in results}
 
@@ -71,13 +71,13 @@ def test_multi_word_locations(scanner: Scanner) -> None:
 
 
 @pytest.mark.integration
-def test_location_with_punctuation(scanner: Scanner) -> None:
+def test_location_with_punctuation(scanner: Scanner, mock_context: UserContext) -> None:
     """
     Test detection of locations with punctuation.
     """
     text = "He is from St. Louis, MO."
     policy = AegisPolicy(entity_types=["LOCATION"], confidence_score=0.4)
-    results = scanner.scan(text, policy)
+    results = scanner.scan(text, policy, context=mock_context)
 
     detected = {text[r.start : r.end] for r in results}
 
@@ -86,7 +86,7 @@ def test_location_with_punctuation(scanner: Scanner) -> None:
 
 
 @pytest.mark.integration
-def test_repeated_locations_consistency() -> None:
+def test_repeated_locations_consistency(mock_context: UserContext) -> None:
     """
     Test that repeated locations map to the same token in REPLACE mode.
     """
@@ -97,7 +97,7 @@ def test_repeated_locations_consistency() -> None:
     text = "I flew from London to Paris, then back to London."
     session_id = "test_loc_consistency"
 
-    sanitized, deid_map = aegis.sanitize(text, session_id)
+    sanitized, deid_map = aegis.sanitize(text, session_id, context=mock_context)
 
     # Expect: "I flew from [LOCATION_A] to [LOCATION_B], then back to [LOCATION_A]."
 
@@ -114,7 +114,7 @@ def test_repeated_locations_consistency() -> None:
 
 
 @pytest.mark.integration
-def test_complex_mixed_entity_paragraph() -> None:
+def test_complex_mixed_entity_paragraph(mock_context: UserContext) -> None:
     """
     Test a complex paragraph with multiple entity types including locations.
     """
@@ -128,7 +128,7 @@ def test_complex_mixed_entity_paragraph() -> None:
     )
     session_id = "test_complex_loc"
 
-    sanitized, deid_map = aegis.sanitize(text, session_id)
+    sanitized, deid_map = aegis.sanitize(text, session_id, context=mock_context)
 
     # Check that original PII is gone
     assert "Alice Smith" not in sanitized

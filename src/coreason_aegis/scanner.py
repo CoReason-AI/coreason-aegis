@@ -17,6 +17,7 @@ recognizers for specific domains like Pharma and Security.
 
 from typing import Any, List, Optional, cast
 
+from coreason_identity.models import UserContext
 from presidio_analyzer import AnalyzerEngine, Pattern, PatternRecognizer, RecognizerResult
 
 from coreason_aegis.models import AegisPolicy
@@ -112,12 +113,13 @@ class Scanner:
         """Returns the underlying Presidio AnalyzerEngine."""
         return self._analyzer
 
-    def scan(self, text: str, policy: AegisPolicy) -> List[RecognizerResult]:
+    def scan(self, text: str, policy: AegisPolicy, context: UserContext) -> List[RecognizerResult]:
         """Scans the provided text for entities defined in the policy.
 
         Args:
             text: The text string to scan.
             policy: The AegisPolicy defining entity types and confidence thresholds.
+            context: The user context for auditing.
 
         Returns:
             A list of RecognizerResult objects containing detected entities.
@@ -125,6 +127,9 @@ class Scanner:
         Raises:
             RuntimeError: If the scan operation fails (Fail Closed principle).
         """
+        if context is None:
+            raise ValueError("UserContext is required")
+
         if not text:
             return []
 

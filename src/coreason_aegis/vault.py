@@ -19,8 +19,10 @@ import time
 from typing import Callable, MutableMapping, Optional
 
 from cachetools import TTLCache
+from coreason_identity.models import UserContext
 
 from coreason_aegis.models import DeIdentificationMap
+from coreason_aegis.utils.logger import logger
 
 
 class VaultManager:
@@ -48,32 +50,46 @@ class VaultManager:
             maxsize=max_size, ttl=ttl_seconds, timer=timer
         )
 
-    def save_map(self, mapping: DeIdentificationMap) -> None:
+    def save_map(self, mapping: DeIdentificationMap, context: UserContext) -> None:
         """Saves or updates a mapping in the vault.
 
         Args:
             mapping: The DeIdentificationMap to store.
+            context: The user context for auditing.
         """
+        if context is None:
+            raise ValueError("UserContext is required")
+
+        logger.info("Storing PII mapping", user_id=context.user_id.get_secret_value())
         self._storage[mapping.session_id] = mapping
 
-    def get_map(self, session_id: str) -> Optional[DeIdentificationMap]:
+    def get_map(self, session_id: str, context: UserContext) -> Optional[DeIdentificationMap]:
         """Retrieves a mapping by session_id.
 
         Args:
             session_id: The unique session identifier.
+            context: The user context for auditing.
 
         Returns:
             The DeIdentificationMap if found and valid, else None.
             (Expiration is handled automatically by the underlying TTLCache).
         """
+        if context is None:
+            raise ValueError("UserContext is required")
+
+        logger.info("Retrieving PII mapping", user_id=context.user_id.get_secret_value())
         # TTLCache automatically handles expiration on access (or rather, hides expired items)
         return self._storage.get(session_id)
 
-    def delete_map(self, session_id: str) -> None:
+    def delete_map(self, session_id: str, context: UserContext) -> None:
         """Deletes a mapping from the vault.
 
         Args:
             session_id: The session ID to remove.
+            context: The user context for auditing.
         """
+        if context is None:
+            raise ValueError("UserContext is required")
+
         if session_id in self._storage:
             del self._storage[session_id]

@@ -11,9 +11,8 @@
 from typing import cast
 
 import pytest
-from pydantic import ValidationError
-
 from coreason_aegis.models import AegisPolicy, RedactionMode
+from pydantic import ValidationError
 
 
 def test_aegis_policy_defaults() -> None:

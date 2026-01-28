@@ -12,10 +12,10 @@ from typing import Generator
 from unittest.mock import MagicMock, patch
 
 import pytest
-from presidio_analyzer import RecognizerResult
-
 from coreason_aegis.models import AegisPolicy
 from coreason_aegis.scanner import Scanner
+from coreason_identity.models import UserContext
+from presidio_analyzer import RecognizerResult
 
 
 @pytest.fixture
@@ -61,19 +61,19 @@ def test_scanner_shared_engine(mock_analyzer_engine: MagicMock) -> None:
     mock_analyzer_engine.assert_called_once()
 
 
-def test_scan_empty_text(scanner: Scanner) -> None:
+def test_scan_empty_text(scanner: Scanner, mock_context: UserContext) -> None:
     policy = AegisPolicy()
-    results = scanner.scan("", policy)
+    results = scanner.scan("", policy, context=mock_context)
     assert results == []
 
 
-def test_scan_success(scanner: Scanner, mock_analyzer_engine: MagicMock) -> None:
+def test_scan_success(scanner: Scanner, mock_analyzer_engine: MagicMock, mock_context: UserContext) -> None:
     mock_instance = mock_analyzer_engine.return_value
     mock_result = RecognizerResult(entity_type="PERSON", start=0, end=4, score=0.9)
     mock_instance.analyze.return_value = [mock_result]
 
     policy = AegisPolicy(entity_types=["PERSON"], confidence_score=0.8)
-    results = scanner.scan("John", policy)
+    results = scanner.scan("John", policy, context=mock_context)
 
     assert len(results) == 1
     assert results[0] == mock_result
@@ -86,13 +86,15 @@ def test_scan_success(scanner: Scanner, mock_analyzer_engine: MagicMock) -> None
     )
 
 
-def test_scan_failure_raises_exception(scanner: Scanner, mock_analyzer_engine: MagicMock) -> None:
+def test_scan_failure_raises_exception(
+    scanner: Scanner, mock_analyzer_engine: MagicMock, mock_context: UserContext
+) -> None:
     mock_instance = mock_analyzer_engine.return_value
     mock_instance.analyze.side_effect = Exception("Analyzer error")
 
     policy = AegisPolicy()
     with pytest.raises(RuntimeError, match="Scan operation failed"):
-        scanner.scan("Test", policy)
+        scanner.scan("Test", policy, context=mock_context)
 
 
 def test_initialization_failure() -> None:

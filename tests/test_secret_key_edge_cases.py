@@ -12,9 +12,9 @@ from typing import Generator
 from unittest.mock import MagicMock, patch
 
 import pytest
-from presidio_analyzer import RecognizerResult
-
 from coreason_aegis.main import Aegis
+from coreason_identity.models import UserContext
+from presidio_analyzer import RecognizerResult
 
 
 @pytest.fixture
@@ -52,7 +52,7 @@ def real_aegis() -> Generator[Aegis, None, None]:
     yield aegis_instance
 
 
-def test_multiple_distinct_keys(aegis: Aegis, mock_scanner_engine: MagicMock) -> None:
+def test_multiple_distinct_keys(aegis: Aegis, mock_scanner_engine: MagicMock, mock_context: UserContext) -> None:
     """
     Test that two different keys map to [SECRET_KEY_A] and [SECRET_KEY_B].
     """
@@ -72,14 +72,14 @@ def test_multiple_distinct_keys(aegis: Aegis, mock_scanner_engine: MagicMock) ->
     mock_instance.analyze.return_value = results
 
     session_id = "edge_case_multi_keys"
-    masked_text, deid_map = aegis.sanitize(text, session_id)
+    masked_text, deid_map = aegis.sanitize(text, session_id, context=mock_context)
 
     assert "Key1: [SECRET_KEY_A], Key2: [SECRET_KEY_B]" == masked_text
     assert deid_map.mappings["[SECRET_KEY_A]"] == key1
     assert deid_map.mappings["[SECRET_KEY_B]"] == key2
 
 
-def test_repeated_keys(aegis: Aegis, mock_scanner_engine: MagicMock) -> None:
+def test_repeated_keys(aegis: Aegis, mock_scanner_engine: MagicMock, mock_context: UserContext) -> None:
     """
     Test that the same key repeated maps to the same token [SECRET_KEY_A].
     """
@@ -96,14 +96,14 @@ def test_repeated_keys(aegis: Aegis, mock_scanner_engine: MagicMock) -> None:
     mock_instance.analyze.return_value = results
 
     session_id = "edge_case_repeat_keys"
-    masked_text, deid_map = aegis.sanitize(text, session_id)
+    masked_text, deid_map = aegis.sanitize(text, session_id, context=mock_context)
 
     assert "Key1: [SECRET_KEY_A], Again: [SECRET_KEY_A]" == masked_text
     assert len(deid_map.mappings) == 1
     assert deid_map.mappings["[SECRET_KEY_A]"] == key1
 
 
-def test_mixed_entities_counters(aegis: Aegis, mock_scanner_engine: MagicMock) -> None:
+def test_mixed_entities_counters(aegis: Aegis, mock_scanner_engine: MagicMock, mock_context: UserContext) -> None:
     """
     Test that SECRET_KEY counters are independent from PATIENT counters.
     Expected: [PATIENT_A] and [SECRET_KEY_A].
@@ -126,7 +126,7 @@ def test_mixed_entities_counters(aegis: Aegis, mock_scanner_engine: MagicMock) -
     mock_instance.analyze.return_value = results
 
     session_id = "edge_case_mixed"
-    masked_text, deid_map = aegis.sanitize(text, session_id)
+    masked_text, deid_map = aegis.sanitize(text, session_id, context=mock_context)
 
     # Should be [PATIENT_A] and [SECRET_KEY_A], not [SECRET_KEY_B]
     assert "[PATIENT_A]" in masked_text
@@ -136,7 +136,7 @@ def test_mixed_entities_counters(aegis: Aegis, mock_scanner_engine: MagicMock) -
 
 
 @pytest.mark.integration
-def test_real_regex_detection(real_aegis: Aegis) -> None:
+def test_real_regex_detection(real_aegis: Aegis, mock_context: UserContext) -> None:
     """
     Test with the REAL scanner to verify the regex for SECRET_KEY works as expected.
     "sk-" followed by 20+ chars.
@@ -147,7 +147,7 @@ def test_real_regex_detection(real_aegis: Aegis) -> None:
     text = f"Here is a valid key: {valid_key} and an invalid one: {invalid_key}."
     session_id = "edge_case_real_regex"
 
-    masked_text, deid_map = real_aegis.sanitize(text, session_id)
+    masked_text, deid_map = real_aegis.sanitize(text, session_id, context=mock_context)
 
     # Valid key should be redacted
     assert valid_key not in masked_text
@@ -161,7 +161,7 @@ def test_real_regex_detection(real_aegis: Aegis) -> None:
 
 
 @pytest.mark.integration
-def test_complex_scenario_mixed_real(real_aegis: Aegis) -> None:
+def test_complex_scenario_mixed_real(real_aegis: Aegis, mock_context: UserContext) -> None:
     """
     Complex scenario with real scanner:
     - Text with Person, Date, Secret Key.
@@ -174,7 +174,7 @@ def test_complex_scenario_mixed_real(real_aegis: Aegis) -> None:
     text = f"User {person} created key {key} on {date}."
     session_id = "complex_real_scenario"
 
-    masked_text, deid_map = real_aegis.sanitize(text, session_id)
+    masked_text, deid_map = real_aegis.sanitize(text, session_id, context=mock_context)
 
     # Check absence of PII
     assert person not in masked_text
@@ -191,5 +191,5 @@ def test_complex_scenario_mixed_real(real_aegis: Aegis) -> None:
     assert "[DATE_A]" in masked_text
 
     # Verify Desanitization
-    restored = real_aegis.desanitize(masked_text, session_id, authorized=True)
+    restored = real_aegis.desanitize(masked_text, session_id, context=mock_context, authorized=True)
     assert restored == text

@@ -9,10 +9,10 @@
 # Source Code: https://github.com/CoReason-AI/coreason_aegis
 
 import pytest
-
 from coreason_aegis.models import DeIdentificationMap
 from coreason_aegis.reidentifier import ReIdentifier
 from coreason_aegis.vault import VaultManager
+from coreason_identity.models import UserContext
 
 
 @pytest.fixture
@@ -25,7 +25,7 @@ def reidentifier(vault: VaultManager) -> ReIdentifier:
     return ReIdentifier(vault)
 
 
-def test_reidentify_success(reidentifier: ReIdentifier, vault: VaultManager) -> None:
+def test_reidentify_success(reidentifier: ReIdentifier, vault: VaultManager, mock_context: UserContext) -> None:
     # Setup
     from datetime import datetime, timezone
 
@@ -35,14 +35,14 @@ def test_reidentify_success(reidentifier: ReIdentifier, vault: VaultManager) -> 
         mappings={"[PATIENT_A]": "John Doe"},
         expires_at=datetime.now(timezone.utc),
     )
-    vault.save_map(deid_map)
+    vault.save_map(deid_map, context=mock_context)
 
     text = "Hello [PATIENT_A]."
-    result = reidentifier.reidentify(text, session_id, authorized=True)
+    result = reidentifier.reidentify(text, session_id, context=mock_context, authorized=True)
     assert result == "Hello John Doe."
 
 
-def test_reidentify_unauthorized(reidentifier: ReIdentifier, vault: VaultManager) -> None:
+def test_reidentify_unauthorized(reidentifier: ReIdentifier, vault: VaultManager, mock_context: UserContext) -> None:
     # Setup
     from datetime import datetime, timezone
 
@@ -52,26 +52,26 @@ def test_reidentify_unauthorized(reidentifier: ReIdentifier, vault: VaultManager
         mappings={"[PATIENT_A]": "John Doe"},
         expires_at=datetime.now(timezone.utc),
     )
-    vault.save_map(deid_map)
+    vault.save_map(deid_map, context=mock_context)
 
     text = "Hello [PATIENT_A]."
-    result = reidentifier.reidentify(text, session_id, authorized=False)
+    result = reidentifier.reidentify(text, session_id, context=mock_context, authorized=False)
     assert result == "Hello [PATIENT_A]."
 
 
-def test_reidentify_no_map(reidentifier: ReIdentifier) -> None:
+def test_reidentify_no_map(reidentifier: ReIdentifier, mock_context: UserContext) -> None:
     # No map in vault
     text = "Hello [PATIENT_A]."
-    result = reidentifier.reidentify(text, "sess_missing", authorized=True)
+    result = reidentifier.reidentify(text, "sess_missing", context=mock_context, authorized=True)
     assert result == "Hello [PATIENT_A]."
 
 
-def test_reidentify_empty_text(reidentifier: ReIdentifier) -> None:
-    result = reidentifier.reidentify("", "sess1", authorized=True)
+def test_reidentify_empty_text(reidentifier: ReIdentifier, mock_context: UserContext) -> None:
+    result = reidentifier.reidentify("", "sess1", context=mock_context, authorized=True)
     assert result == ""
 
 
-def test_reidentify_empty_mappings(reidentifier: ReIdentifier, vault: VaultManager) -> None:
+def test_reidentify_empty_mappings(reidentifier: ReIdentifier, vault: VaultManager, mock_context: UserContext) -> None:
     # Map exists but is empty
     from datetime import datetime, timezone
 
@@ -81,14 +81,14 @@ def test_reidentify_empty_mappings(reidentifier: ReIdentifier, vault: VaultManag
         mappings={},
         expires_at=datetime.now(timezone.utc),
     )
-    vault.save_map(deid_map)
+    vault.save_map(deid_map, context=mock_context)
 
     text = "Hello [PATIENT_A]."
-    result = reidentifier.reidentify(text, session_id, authorized=True)
+    result = reidentifier.reidentify(text, session_id, context=mock_context, authorized=True)
     assert result == text
 
 
-def test_reidentify_partial_overlap(reidentifier: ReIdentifier, vault: VaultManager) -> None:
+def test_reidentify_partial_overlap(reidentifier: ReIdentifier, vault: VaultManager, mock_context: UserContext) -> None:
     # Case: [TOKEN] vs [TOKEN_A] ?
     # Our tokens are distinct ([PATIENT_A], [PATIENT_B]) so low risk.
     # But checking multiple tokens.
@@ -103,14 +103,16 @@ def test_reidentify_partial_overlap(reidentifier: ReIdentifier, vault: VaultMana
         },
         expires_at=datetime.now(timezone.utc),
     )
-    vault.save_map(deid_map)
+    vault.save_map(deid_map, context=mock_context)
 
     text = "[A] and [B]"
-    result = reidentifier.reidentify(text, session_id, authorized=True)
+    result = reidentifier.reidentify(text, session_id, context=mock_context, authorized=True)
     assert result == "Alpha and Beta"
 
 
-def test_reidentify_nested_substrings(reidentifier: ReIdentifier, vault: VaultManager) -> None:
+def test_reidentify_nested_substrings(
+    reidentifier: ReIdentifier, vault: VaultManager, mock_context: UserContext
+) -> None:
     # Case: [A] and [AA]
     # If we replace [A] first, [AA] becomes [AlphaA] (incorrect) or similar.
     # Logic should handle sorting keys by length descending.
@@ -125,11 +127,11 @@ def test_reidentify_nested_substrings(reidentifier: ReIdentifier, vault: VaultMa
         },
         expires_at=datetime.now(timezone.utc),
     )
-    vault.save_map(deid_map)
+    vault.save_map(deid_map, context=mock_context)
 
     text = "This is [A] and this is [AA]."
     # Should replace [AA] first -> "This is [A] and this is Long."
     # Then [A] -> "This is Short and this is Long."
 
-    result = reidentifier.reidentify(text, session_id, authorized=True)
+    result = reidentifier.reidentify(text, session_id, context=mock_context, authorized=True)
     assert result == "This is Short and this is Long."

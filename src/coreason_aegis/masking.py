@@ -19,6 +19,7 @@ import hashlib
 import string
 from typing import Any, Dict, List, Tuple, cast
 
+from coreason_identity.models import UserContext
 from faker import Faker
 from presidio_analyzer import RecognizerResult
 
@@ -50,6 +51,7 @@ class MaskingEngine:
         results: List[RecognizerResult],
         policy: AegisPolicy,
         session_id: str,
+        context: UserContext,
     ) -> Tuple[str, DeIdentificationMap]:
         """Masks the provided text based on scanner results and policy.
 
@@ -58,14 +60,18 @@ class MaskingEngine:
             results: List of entity detection results from the Scanner.
             policy: The AegisPolicy defining the redaction mode (MASK, REPLACE, etc.).
             session_id: The unique session identifier.
+            context: The user context for auditing.
 
         Returns:
             A tuple containing:
             - The masked text string.
             - The updated DeIdentificationMap containing the token mappings.
         """
+        if context is None:
+            raise ValueError("UserContext is required")
+
         # Retrieve existing map or create new one
-        deid_map = self.vault.get_map(session_id)
+        deid_map = self.vault.get_map(session_id, context=context)
         if not deid_map:
             from datetime import datetime, timedelta, timezone
 
@@ -146,7 +152,7 @@ class MaskingEngine:
 
         # Save updated map (Only relevant for REPLACE mode,
         # but saving is harmless/idempotent for others if mapping didn't change)
-        self.vault.save_map(deid_map)
+        self.vault.save_map(deid_map, context=context)
 
         return masked_text, deid_map
 

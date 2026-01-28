@@ -9,6 +9,7 @@
 # Source Code: https://github.com/CoReason-AI/coreason_aegis
 
 import pytest
+from coreason_identity.models import UserContext
 from presidio_analyzer import RecognizerResult
 
 from coreason_aegis.masking import MaskingEngine
@@ -21,19 +22,19 @@ def masking_engine() -> MaskingEngine:
     return MaskingEngine(VaultManager())
 
 
-def test_empty_results(masking_engine: MaskingEngine) -> None:
+def test_empty_results(masking_engine: MaskingEngine, mock_context: UserContext) -> None:
     text = "Nothing here."
     results: list[RecognizerResult] = []
     policy = AegisPolicy()
-    masked, _ = masking_engine.mask(text, results, policy, "sess_empty")
+    masked, _ = masking_engine.mask(text, results, policy, "sess_empty", context=mock_context)
     assert masked == text
 
 
-def test_empty_text(masking_engine: MaskingEngine) -> None:
+def test_empty_text(masking_engine: MaskingEngine, mock_context: UserContext) -> None:
     text = ""
     results: list[RecognizerResult] = []
     policy = AegisPolicy()
-    masked, _ = masking_engine.mask(text, results, policy, "sess_empty_text")
+    masked, _ = masking_engine.mask(text, results, policy, "sess_empty_text", context=mock_context)
     assert masked == ""
 
 
@@ -49,7 +50,7 @@ def test_result_out_of_bounds(masking_engine: MaskingEngine) -> None:
     pass
 
 
-def test_policy_allow_list_case_sensitivity(masking_engine: MaskingEngine) -> None:
+def test_policy_allow_list_case_sensitivity(masking_engine: MaskingEngine, mock_context: UserContext) -> None:
     # Check if allow list matches exact string.
     text = "John vs john"
     # John 0-4
@@ -60,7 +61,7 @@ def test_policy_allow_list_case_sensitivity(masking_engine: MaskingEngine) -> No
     ]
     policy = AegisPolicy(mode=RedactionMode.MASK, allow_list=["John"])
 
-    masked, _ = masking_engine.mask(text, results, policy, "sess_case")
+    masked, _ = masking_engine.mask(text, results, policy, "sess_case", context=mock_context)
 
     # "John" allowed -> kept.
     # "john" not in allow list -> masked.

@@ -14,10 +14,14 @@ This module provides the primary `Aegis` class, which orchestrates the scanning,
 masking, and re-identification processes to enforce data privacy policies.
 """
 
+# mypy: no-warn-unused-ignores
+
 from typing import Any, Optional, Tuple, cast
 
 import anyio
 import httpx
+from coreason_identity.models import UserContext
+from coreason_identity.types import SecretStr
 
 from coreason_aegis.masking import MaskingEngine
 from coreason_aegis.models import AegisPolicy, DeIdentificationMap
@@ -63,6 +67,7 @@ class AegisAsync:
         self,
         text: str,
         session_id: str,
+        context: UserContext,
         policy: Optional[AegisPolicy] = None,
     ) -> Tuple[str, DeIdentificationMap]:
         """Scans and masks the input text based on the provided policy.
@@ -70,6 +75,7 @@ class AegisAsync:
         Args:
             text: The text to sanitize.
             session_id: The unique session identifier.
+            context: The user context for auditing.
             policy: Optional AegisPolicy override. Uses default if None.
 
         Returns:
@@ -80,12 +86,15 @@ class AegisAsync:
         Raises:
             Exception: If sanitization fails (Fail Closed).
         """
+        if context is None:
+            raise ValueError("UserContext is required")
+
         active_policy = policy or self._default_policy
 
         try:
             # 1. Scan (CPU bound)
             # Wrap synchronous scanner call in thread
-            results = await anyio.to_thread.run_sync(self.scanner.scan, text, active_policy)
+            results = await anyio.to_thread.run_sync(self.scanner.scan, text, active_policy, context)
 
             # Check for API Keys and alert
             for result in results:
@@ -97,7 +106,7 @@ class AegisAsync:
             # Note: MaskingEngine uses VaultManager which is thread-safe for reads/writes if properly implemented,
             # but currently it's just a dict wrapper.
             masked_text, deid_map = await anyio.to_thread.run_sync(
-                self.masking_engine.mask, text, results, active_policy, session_id
+                self.masking_engine.mask, text, results, active_policy, session_id, context
             )
 
             # Log success (omitting PII)
@@ -114,6 +123,7 @@ class AegisAsync:
         self,
         text: str,
         session_id: str,
+        context: UserContext,
         authorized: bool = False,
     ) -> str:
         """Re-identifies the input text (e.g., response from LLM).
@@ -121,6 +131,7 @@ class AegisAsync:
         Args:
             text: The text to de-sanitize.
             session_id: The unique session identifier.
+            context: The user context for auditing.
             authorized: Whether the requestor is authorized to view real PII.
 
         Returns:
@@ -129,12 +140,15 @@ class AegisAsync:
         Raises:
             Exception: If de-sanitization fails.
         """
+        if context is None:
+            raise ValueError("UserContext is required")
+
         try:
             # CPU bound
             # Explicitly cast to str because run_sync returns Any
-            result = await anyio.to_thread.run_sync(self.reidentifier.reidentify, text, session_id, authorized)
+            result = await anyio.to_thread.run_sync(self.reidentifier.reidentify, text, session_id, context, authorized)
             logger.info(f"Desanitized text for session {session_id}. Authorized: {authorized}")
-            return cast(str, result)
+            return cast(str, result)  # type: ignore
         except Exception as e:
             logger.error(f"Desanitization failed for session {session_id}: {e}")
             # Fail Closed: Propagate exception
@@ -168,22 +182,65 @@ class Aegis:
         self,
         text: str,
         session_id: str,
+        context: UserContext,
         policy: Optional[AegisPolicy] = None,
     ) -> Tuple[str, DeIdentificationMap]:
         """Scans and masks the input text (blocking)."""
-        return cast(
+        return cast(  # type: ignore
             Tuple[str, DeIdentificationMap],
-            anyio.run(self._async.sanitize, text, session_id, policy),
+            anyio.run(self._async.sanitize, text, session_id, context, policy),
         )
 
     def desanitize(
         self,
         text: str,
         session_id: str,
+        context: UserContext,
         authorized: bool = False,
     ) -> str:
         """Re-identifies the input text (blocking)."""
-        return cast(
+        return cast(  # type: ignore
             str,
-            anyio.run(self._async.desanitize, text, session_id, authorized),
+            anyio.run(self._async.desanitize, text, session_id, context, authorized),
         )
+
+
+def _get_system_context() -> UserContext:
+    """Creates a local system context for CLI operations."""
+    return UserContext(
+        user_id=SecretStr("cli-user"),
+        roles=["system"],
+        metadata={"source": "cli"},
+    )
+
+
+def scan(text: str) -> None:
+    """CLI command to scan text."""
+    context = _get_system_context()
+    scanner = Scanner()
+    policy = AegisPolicy()
+    results = scanner.scan(text, policy, context=context)
+    print(f"Scan Results: {results}")
+
+
+def mask(text: str, session_id: str) -> None:
+    """CLI command to mask text."""
+    context = _get_system_context()
+    vault = VaultManager()
+    scanner = Scanner()
+    masking_engine = MaskingEngine(vault)
+    policy = AegisPolicy()
+
+    results = scanner.scan(text, policy, context=context)
+    masked_text, _ = masking_engine.mask(text, results, policy, session_id, context=context)
+    print(f"Masked Text: {masked_text}")
+
+
+def reidentify(text: str, session_id: str) -> None:
+    """CLI command to reidentify text."""
+    context = _get_system_context()
+    vault = VaultManager()
+    reidentifier = ReIdentifier(vault)
+    # Note: This will fail to find mapping if vault is empty (new instance)
+    result = reidentifier.reidentify(text, session_id, context=context, authorized=True)
+    print(f"Reidentified Text: {result}")

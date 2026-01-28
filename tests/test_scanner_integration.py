@@ -9,6 +9,7 @@
 # Source Code: https://github.com/CoReason-AI/coreason_aegis
 
 import pytest
+from coreason_identity.models import UserContext
 
 from coreason_aegis.models import AegisPolicy
 from coreason_aegis.scanner import Scanner
@@ -20,7 +21,7 @@ def scanner() -> Scanner:
 
 
 @pytest.mark.integration
-def test_standard_entity_detection(scanner: Scanner) -> None:
+def test_standard_entity_detection(scanner: Scanner, mock_context: UserContext) -> None:
     """
     Verifies that the Spacy model is loaded and working by detecting standard entities.
     """
@@ -30,7 +31,7 @@ def test_standard_entity_detection(scanner: Scanner) -> None:
         confidence_score=0.4,  # Slightly lower threshold for standard entities to be safe in tests
     )
 
-    results = scanner.scan(text, policy)
+    results = scanner.scan(text, policy, context=mock_context)
 
     detected_types = {r.entity_type for r in results}
     detected_text = {text[r.start : r.end] for r in results}
@@ -45,7 +46,7 @@ def test_standard_entity_detection(scanner: Scanner) -> None:
 
 
 @pytest.mark.integration
-def test_location_detection(scanner: Scanner) -> None:
+def test_location_detection(scanner: Scanner, mock_context: UserContext) -> None:
     """
     Verifies that 'LOCATION' entities are detected correctly.
     """
@@ -56,7 +57,7 @@ def test_location_detection(scanner: Scanner) -> None:
         confidence_score=0.4,
     )
 
-    results = scanner.scan(text, policy)
+    results = scanner.scan(text, policy, context=mock_context)
 
     detected_types = {r.entity_type for r in results}
     detected_text = {text[r.start : r.end] for r in results}
@@ -70,7 +71,7 @@ def test_location_detection(scanner: Scanner) -> None:
 
 
 @pytest.mark.integration
-def test_complex_mixed_scenario(scanner: Scanner) -> None:
+def test_complex_mixed_scenario(scanner: Scanner, mock_context: UserContext) -> None:
     """
     Tests a complex scenario with mixed custom and standard entities,
     verifying they coexist and are detected correctly.
@@ -87,7 +88,7 @@ def test_complex_mixed_scenario(scanner: Scanner) -> None:
         entity_types=["PERSON", "MRN", "DATE_TIME", "PROTOCOL_ID", "EMAIL_ADDRESS", "LOT_NUMBER"], confidence_score=0.4
     )
 
-    results = scanner.scan(text, policy)
+    results = scanner.scan(text, policy, context=mock_context)
 
     # Helper to find result by type
     def get_text_by_type(etype: str) -> list[str]:
@@ -109,7 +110,7 @@ def test_complex_mixed_scenario(scanner: Scanner) -> None:
 
 
 @pytest.mark.integration
-def test_overlap_and_adjacency(scanner: Scanner) -> None:
+def test_overlap_and_adjacency(scanner: Scanner, mock_context: UserContext) -> None:
     """
     Tests scenarios where entities are adjacent or potentially overlapping.
     """
@@ -118,7 +119,7 @@ def test_overlap_and_adjacency(scanner: Scanner) -> None:
     text = "Check LOT-A1 123456 and SKY-123."
 
     policy = AegisPolicy(entity_types=["LOT_NUMBER", "MRN", "PROTOCOL_ID"], confidence_score=0.5)
-    results = scanner.scan(text, policy)
+    results = scanner.scan(text, policy, context=mock_context)
 
     detected = {text[r.start : r.end] for r in results}
 
@@ -128,7 +129,7 @@ def test_overlap_and_adjacency(scanner: Scanner) -> None:
 
 
 @pytest.mark.integration
-def test_large_input_stability(scanner: Scanner) -> None:
+def test_large_input_stability(scanner: Scanner, mock_context: UserContext) -> None:
     """
     Tests stability with a larger input buffer.
     """
@@ -139,21 +140,21 @@ def test_large_input_stability(scanner: Scanner) -> None:
     policy = AegisPolicy(entity_types=["PERSON", "MRN"], confidence_score=0.5)
 
     # Should not raise exception
-    results = scanner.scan(text, policy)
+    results = scanner.scan(text, policy, context=mock_context)
 
     assert len(results) >= 500  # Should detect at least one per repetition
     assert len(results) <= 1000  # Person + MRN per repetition
 
 
 @pytest.mark.integration
-def test_unicode_and_emojis(scanner: Scanner) -> None:
+def test_unicode_and_emojis(scanner: Scanner, mock_context: UserContext) -> None:
     """
     Tests stability and detection in text containing Unicode chars and emojis.
     """
     text = "User 🤖 John Doe 😷 (MRN 123456) sent email: john.doe@example.com."
     policy = AegisPolicy(entity_types=["PERSON", "MRN", "EMAIL_ADDRESS"], confidence_score=0.4)
 
-    results = scanner.scan(text, policy)
+    results = scanner.scan(text, policy, context=mock_context)
     detected = {text[r.start : r.end] for r in results}
 
     # Spacy might include the emoji in the entity (e.g., "John Doe 😷") depending on tokenization.
@@ -169,7 +170,7 @@ def test_unicode_and_emojis(scanner: Scanner) -> None:
 
 
 @pytest.mark.integration
-def test_ambiguous_names_location(scanner: Scanner) -> None:
+def test_ambiguous_names_location(scanner: Scanner, mock_context: UserContext) -> None:
     """
     Tests if Spacy model can distinguish between ambiguous names.
     Note: Presidio mostly relies on Spacy NER for PERSON vs LOCATION.
@@ -186,7 +187,7 @@ def test_ambiguous_names_location(scanner: Scanner) -> None:
     # Default AegisPolicy only asks for PERSON.
 
     policy = AegisPolicy(entity_types=["PERSON"], confidence_score=0.4)
-    results = scanner.scan(text, policy)
+    results = scanner.scan(text, policy, context=mock_context)
 
     detected_texts = [text[r.start : r.end] for r in results if r.entity_type == "PERSON"]
 

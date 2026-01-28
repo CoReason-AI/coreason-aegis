@@ -11,6 +11,7 @@
 from typing import Generator
 
 import pytest
+from coreason_identity.models import UserContext
 
 from coreason_aegis.main import Aegis
 
@@ -26,7 +27,7 @@ def real_aegis() -> Generator[Aegis, None, None]:
 
 
 @pytest.mark.integration
-def test_story_a_end_to_end(real_aegis: Aegis) -> None:
+def test_story_a_end_to_end(real_aegis: Aegis, mock_context: UserContext) -> None:
     """
     User Story A: The 'Safe Consultation' (Runtime Protection)
 
@@ -41,7 +42,7 @@ def test_story_a_end_to_end(real_aegis: Aegis) -> None:
     # This calls the real Presidio model.
     # John Doe -> PERSON -> [PATIENT_A] (assuming it's the first person detected)
     # 12/01/1980 -> DATE_TIME -> [DATE_A]
-    sanitized_prompt, deid_map = real_aegis.sanitize(user_prompt, session_id)
+    sanitized_prompt, deid_map = real_aegis.sanitize(user_prompt, session_id, context=mock_context)
 
     # Verification 1: PII is removed
     assert "John Doe" not in sanitized_prompt
@@ -68,7 +69,7 @@ def test_story_a_end_to_end(real_aegis: Aegis) -> None:
 
     # 4. Desanitize (The Reveal)
     # Aegis should map the tokens back to the original values.
-    final_output = real_aegis.desanitize(llm_response, session_id, authorized=True)
+    final_output = real_aegis.desanitize(llm_response, session_id, context=mock_context, authorized=True)
 
     # Verification 3: Real data is restored
     assert "John Doe" in final_output
@@ -81,7 +82,7 @@ def test_story_a_end_to_end(real_aegis: Aegis) -> None:
 
 
 @pytest.mark.integration
-def test_multi_turn_consistency(real_aegis: Aegis) -> None:
+def test_multi_turn_consistency(real_aegis: Aegis, mock_context: UserContext) -> None:
     """
     Test Case 1: Consistency across multiple turns.
     "John Doe" must map to the same token within the session.
@@ -90,19 +91,19 @@ def test_multi_turn_consistency(real_aegis: Aegis) -> None:
 
     # Turn 1
     input1 = "John Doe is here."
-    sanitized1, _ = real_aegis.sanitize(input1, session_id)
+    sanitized1, _ = real_aegis.sanitize(input1, session_id, context=mock_context)
     assert "[PATIENT_A]" in sanitized1
 
     # Turn 2
     input2 = "Does John Doe have insurance?"
-    sanitized2, _ = real_aegis.sanitize(input2, session_id)
+    sanitized2, _ = real_aegis.sanitize(input2, session_id, context=mock_context)
     # Should reuse [PATIENT_A], not create [PATIENT_B]
     assert "[PATIENT_A]" in sanitized2
     assert "[PATIENT_B]" not in sanitized2
 
 
 @pytest.mark.integration
-def test_multiple_identities(real_aegis: Aegis) -> None:
+def test_multiple_identities(real_aegis: Aegis, mock_context: UserContext) -> None:
     """
     Test Case 2: Multiple distinct entities in the same text.
     John Doe -> [PATIENT_A]
@@ -111,7 +112,7 @@ def test_multiple_identities(real_aegis: Aegis) -> None:
     session_id = "session_multiple"
     text = "John Doe and Jane Smith are meeting."
 
-    sanitized, deid_map = real_aegis.sanitize(text, session_id)
+    sanitized, deid_map = real_aegis.sanitize(text, session_id, context=mock_context)
 
     assert "[PATIENT_A]" in sanitized
     assert "[PATIENT_B]" in sanitized
@@ -126,19 +127,19 @@ def test_multiple_identities(real_aegis: Aegis) -> None:
 
 
 @pytest.mark.integration
-def test_hallucinated_token(real_aegis: Aegis) -> None:
+def test_hallucinated_token(real_aegis: Aegis, mock_context: UserContext) -> None:
     """
     Test Case 3: LLM returns a token that doesn't exist.
     """
     session_id = "session_hallucination"
 
     # Seed the session with one entity
-    real_aegis.sanitize("John Doe", session_id)
+    real_aegis.sanitize("John Doe", session_id, context=mock_context)
 
     # Simulate LLM returning a non-existent token [PATIENT_X]
     llm_response = "I spoke with [PATIENT_X] and [PATIENT_A]."
 
-    result = real_aegis.desanitize(llm_response, session_id, authorized=True)
+    result = real_aegis.desanitize(llm_response, session_id, context=mock_context, authorized=True)
 
     # [PATIENT_A] should be resolved. [PATIENT_X] should remain.
     assert "John Doe" in result

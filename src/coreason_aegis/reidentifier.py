@@ -14,6 +14,8 @@ This module provides the logic to reverse the tokenization process, restoring or
 values for authorized users based on the stored session mappings.
 """
 
+from coreason_identity.models import UserContext
+
 from coreason_aegis.vault import VaultManager
 
 
@@ -36,6 +38,7 @@ class ReIdentifier:
         self,
         text: str,
         session_id: str,
+        context: UserContext,
         authorized: bool = False,
     ) -> str:
         """Replaces tokens with real values if authorized.
@@ -43,17 +46,21 @@ class ReIdentifier:
         Args:
             text: The text containing tokens (e.g., "[PATIENT_A]").
             session_id: The unique session identifier.
+            context: The user context for auditing.
             authorized: Whether the requestor is authorized to view real PII.
 
         Returns:
             The re-identified text (if authorized and map exists), or the original
             text with tokens preserved.
         """
+        if context is None:
+            raise ValueError("UserContext is required")
+
         if not text:
             return ""
 
         # Retrieve the map
-        deid_map = self.vault.get_map(session_id)
+        deid_map = self.vault.get_map(session_id, context=context)
         if not deid_map:
             # If no map exists (expired or never created), we cannot re-identify.
             # Return text as is (with tokens).

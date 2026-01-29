@@ -44,3 +44,6 @@ USER appuser
 
 # Add user's local bin to PATH
 ENV PATH="/home/appuser/.local/bin:${PATH}"
+
+# Start the uvicorn server
+CMD ["uvicorn", "coreason_aegis.server:app", "--host", "0.0.0.0", "--port", "8000"]

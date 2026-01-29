@@ -38,16 +38,21 @@ class AegisAsync:
     a unified API for sanitizing and de-sanitizing text in an async-native way.
     """
 
-    def __init__(self, client: Optional[httpx.AsyncClient] = None) -> None:
+    def __init__(
+        self,
+        client: Optional[httpx.AsyncClient] = None,
+        vault_ttl: int = 3600,
+    ) -> None:
         """Initializes the Aegis system and its components.
 
         Args:
             client: Optional httpx.AsyncClient for external connections.
+            vault_ttl: TTL for the vault in seconds.
         """
         self._internal_client = client is None
         self._client = client or httpx.AsyncClient()
 
-        self.vault = VaultManager()
+        self.vault = VaultManager(ttl_seconds=vault_ttl)
         self.scanner = Scanner()
         self.masking_engine = MaskingEngine(self.vault)
         self.reidentifier = ReIdentifier(self.vault)
@@ -161,13 +166,18 @@ class Aegis:
     Wraps AegisAsync to provide a blocking interface.
     """
 
-    def __init__(self, client: Optional[httpx.AsyncClient] = None) -> None:
+    def __init__(
+        self,
+        client: Optional[httpx.AsyncClient] = None,
+        vault_ttl: int = 3600,
+    ) -> None:
         """Initializes the Aegis facade.
 
         Args:
             client: Optional httpx.AsyncClient (passed to AegisAsync).
+            vault_ttl: TTL for the vault in seconds.
         """
-        self._async = AegisAsync(client=client)
+        self._async = AegisAsync(client=client, vault_ttl=vault_ttl)
 
     def __enter__(self) -> "Aegis":
         """Context manager entry."""

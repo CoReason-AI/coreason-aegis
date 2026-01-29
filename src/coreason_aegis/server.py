@@ -17,18 +17,18 @@ intended to run as a sidecar or gateway service.
 from contextlib import asynccontextmanager
 from typing import Any, Dict, Optional
 
+from coreason_identity.models import UserContext
+from coreason_identity.types import SecretStr
 from fastapi import FastAPI, HTTPException, status
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from coreason_identity.models import UserContext
-from coreason_identity.types import SecretStr
 
 from coreason_aegis.main import AegisAsync
 from coreason_aegis.models import AegisPolicy, DeIdentificationMap
 from coreason_aegis.utils.logger import logger
 
 
-class Settings(BaseSettings):
+class Settings(BaseSettings):  # type: ignore
     """Server configuration."""
 
     model_config = SettingsConfigDict(env_prefix="AEGIS_")
@@ -122,9 +122,7 @@ async def desanitize(request: DesanitizeRequest) -> DesanitizeResponse:
     """Desanitizes text using the stored map for the session."""
     try:
         context = get_context(request.session_id)
-        text = await app.state.aegis.desanitize(
-            request.text, request.session_id, context, request.authorized
-        )
+        text = await app.state.aegis.desanitize(request.text, request.session_id, context, request.authorized)
         return DesanitizeResponse(text=text)
     except Exception as e:
         logger.error(f"Desanitize request failed: {e}")
@@ -146,6 +144,6 @@ async def health() -> Dict[str, str]:
         if app.state.aegis.scanner.analyzer is None:
             raise RuntimeError("Analyzer not initialized")
     except Exception:
-        raise HTTPException(status_code=503, detail="Unhealthy")
+        raise HTTPException(status_code=503, detail="Unhealthy") from None
 
     return {"status": "protected", "engine": "presidio", "model": "en_core_web_lg"}
